@@ -1,0 +1,43 @@
+<?php
+/** @var \Modracx\AdminDevTools\Block\Adminhtml\Panel $block */
+$path    = (string) $block->getData('path');
+$results = (array) $block->getData('results');
+$error   = (string) $block->getData('error');
+?>
+<div class="modracx-panel-head">
+    <span class="modracx-panel-title"><?= $block->escapeHtml(__('Config path lookup')) ?></span>
+</div>
+
+<div class="modracx-panel-form">
+    <input type="text" class="modracx-input" id="modracx-config-path"
+           value="<?= $block->escapeHtmlAttr($path) ?>"
+           placeholder="web/secure/base_url"
+           spellcheck="false" autocomplete="off">
+    <button type="button" class="modracx-run-btn" id="modracx-config-go"><?= $block->escapeHtml(__('Resolve')) ?></button>
+</div>
+
+<?php if ($error !== ''): ?>
+<div class="modracx-verdict modracx-verdict-err"><?= $block->escapeHtml($error) ?></div>
+<?php elseif ($path === ''): ?>
+<div class="modracx-panel-empty">
+    <?= $block->escapeHtml(__('Enter a path to see its value in every scope, as the application resolves it (config.xml defaults and env.php overrides included).')) ?>
+</div>
+<?php elseif (empty($results)): ?>
+<div class="modracx-panel-empty"><?= $block->escapeHtml(__('No value found.')) ?></div>
+<?php else: ?>
+<div class="modracx-section"><code class="modracx-code"><?= $block->escapeHtml($path) ?></code></div>
+<?php foreach ($results as $result): ?>
+<div class="modracx-row modracx-stack">
+    <span class="modracx-item-name">
+        <?= $block->escapeHtml($result['scope']) ?>
+        <em class="modracx-value<?= $result['masked'] ? ' modracx-value-masked' : '' ?>">
+            <?php if (!$result['set'] && !$result['masked']): ?>
+            <span class="modracx-value-unset"><?= $block->escapeHtml(__('(not set)')) ?></span>
+            <?php else: ?>
+            <?= $block->escapeHtml($result['value']) ?>
+            <?php endif; ?>
+        </em>
+    </span>
+</div>
+<?php endforeach; ?>
+<?php endif; ?>

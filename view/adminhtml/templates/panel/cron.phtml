@@ -1,0 +1,107 @@
+<?php
+/** @var \Modracx\AdminDevTools\Block\Adminhtml\Panel $block */
+$badge  = (array) $block->getData('badge');
+$counts = (array) $block->getData('counts');
+$groups = (array) $block->getData('groups');
+$errors = (array) $block->getData('errors');
+$hours  = (int) $block->getData('recent_hours');
+$queues = (array) $block->getData('queues');
+$queuesAvailable = (bool) $block->getData('queues_available');
+?>
+<div class="modracx-panel-head">
+    <span class="modracx-panel-title"><?= $block->escapeHtml(__('Cron — last %1 hours', $hours)) ?></span>
+    <div class="modracx-panel-actions">
+        <button type="button" class="modracx-run-btn modracx-panel-refresh"><?= $block->escapeHtml(__('Refresh')) ?></button>
+    </div>
+</div>
+
+<div class="modracx-verdict modracx-verdict-<?= $block->escapeHtmlAttr((string) ($badge['level'] ?? 'ok')) ?>">
+    <?= $block->escapeHtml((string) ($badge['detail'] ?? '')) ?>
+</div>
+
+<?php if (!empty($counts)): ?>
+<div class="modracx-chips">
+    <?php foreach ($counts as $status => $total): ?>
+    <span class="modracx-chip modracx-chip-<?= $block->escapeHtmlAttr((string) $status) ?>">
+        <?= $block->escapeHtml((string) $status) ?>
+        <b><?= $block->escapeHtml((string) $total) ?></b>
+    </span>
+    <?php endforeach; ?>
+</div>
+<?php endif; ?>
+
+<div class="modracx-section"><?= $block->escapeHtml(__('Groups')) ?></div>
+<?php if (empty($groups)): ?>
+<div class="modracx-panel-empty"><?= $block->escapeHtml(__('No cron groups configured.')) ?></div>
+<?php else: ?>
+<?php foreach ($groups as $group): ?>
+<div class="modracx-row">
+    <span class="modracx-item-name">
+        <?= $block->escapeHtml($group['group']) ?>
+        <em class="modracx-item-desc">
+            <?php if ($group['last_success'] !== null): ?>
+            <?= $block->escapeHtml(__('last success %1', $group['last_success'])) ?>
+            <?php else: ?>
+            <?= $block->escapeHtml(__('no success in the last 7 days')) ?>
+            <?php endif; ?>
+            · <?= $block->escapeHtml(__('%1 job(s)', $group['jobs'])) ?>
+        </em>
+    </span>
+    <span class="modracx-item-counts">
+        <?php if ($group['error'] > 0): ?>
+        <em class="modracx-item-flag modracx-flag-err"><?= $block->escapeHtml(__('%1 error', $group['error'])) ?></em>
+        <?php endif; ?>
+        <?php if ($group['missed'] > 0): ?>
+        <em class="modracx-item-flag modracx-flag-warn"><?= $block->escapeHtml(__('%1 missed', $group['missed'])) ?></em>
+        <?php endif; ?>
+        <?php if ($group['pending'] > 0): ?>
+        <em class="modracx-item-flag"><?= $block->escapeHtml(__('%1 pending', $group['pending'])) ?></em>
+        <?php endif; ?>
+    </span>
+</div>
+<?php endforeach; ?>
+<?php endif; ?>
+
+<?php if (!empty($errors)): ?>
+<div class="modracx-section"><?= $block->escapeHtml(__('Recent failures')) ?></div>
+<?php foreach ($errors as $error): ?>
+<div class="modracx-row modracx-stack">
+    <span class="modracx-item-name">
+        <?= $block->escapeHtml((string) $error['job_code']) ?>
+        <em class="modracx-item-flag <?= $error['status'] === 'error' ? 'modracx-flag-err' : 'modracx-flag-warn' ?>">
+            <?= $block->escapeHtml((string) $error['status']) ?>
+        </em>
+        <em class="modracx-item-desc">
+            <?= $block->escapeHtml((string) $error['scheduled_at']) ?>
+            <?php if (!empty($error['messages'])): ?>
+            — <?= $block->escapeHtml(mb_substr((string) $error['messages'], 0, 300)) ?>
+            <?php endif; ?>
+        </em>
+    </span>
+</div>
+<?php endforeach; ?>
+<?php endif; ?>
+
+<div class="modracx-section"><?= $block->escapeHtml(__('Message queues')) ?></div>
+<?php if (!$queuesAvailable): ?>
+<div class="modracx-panel-empty">
+    <?= $block->escapeHtml(__('MySQL queue tables are not present — this store uses an external broker such as RabbitMQ.')) ?>
+</div>
+<?php elseif (empty($queues)): ?>
+<div class="modracx-panel-empty"><?= $block->escapeHtml(__('No messages in any queue.')) ?></div>
+<?php else: ?>
+<?php foreach ($queues as $queue): ?>
+<div class="modracx-row">
+    <span class="modracx-item-name">
+        <?= $block->escapeHtml($queue['queue']) ?>
+        <em class="modracx-item-desc">
+            <?php $parts = []; foreach ($queue['counts'] as $label => $total) { $parts[] = $label . ': ' . $total; } ?>
+            <?= $block->escapeHtml(implode(' · ', $parts)) ?>
+        </em>
+    </span>
+    <?php if ($queue['problems'] > 0): ?>
+    <em class="modracx-item-flag modracx-flag-err"><?= $block->escapeHtml((string) $queue['problems']) ?></em>
+    <?php endif; ?>
+</div>
+<?php endforeach; ?>
+<?php endif; ?>

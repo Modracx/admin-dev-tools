@@ -1,0 +1,114 @@
+<?php
+/** @var \Modracx\AdminDevTools\Block\Adminhtml\Panel $block */
+$available = (bool) $block->getData('available');
+$entries   = (array) $block->getData('entries');
+$sources   = (array) $block->getData('sources');
+$total     = (int) $block->getData('total');
+$filters   = (array) $block->getData('filters');
+$retention = (int) $block->getData('retention');
+$canClear  = (bool) $block->getData('can_clear');
+
+$actions = ['create' => __('created'), 'update' => __('updated'), 'delete' => __('deleted')];
+?>
+<div class="modracx-panel-head">
+    <span class="modracx-panel-title"><?= $block->escapeHtml(__('Activity')) ?></span>
+    <div class="modracx-panel-actions">
+        <button type="button" class="modracx-run-btn modracx-panel-refresh"><?= $block->escapeHtml(__('Refresh')) ?></button>
+        <?php if ($canClear && $available): ?>
+        <button type="button" class="modracx-run-btn modracx-danger-btn modracx-activity-clear"><?= $block->escapeHtml(__('Clear')) ?></button>
+        <?php endif; ?>
+    </div>
+</div>
+
+<?php if (!$available): ?>
+<div class="modracx-panel-empty">
+    <?= $block->escapeHtml(__('The activity table does not exist yet. Run bin/magento setup:upgrade to create it.')) ?>
+</div>
+<?php else: ?>
+
+<div class="modracx-panel-form">
+    <select class="modracx-select modracx-activity-filter" data-filter="source">
+        <option value=""><?= $block->escapeHtml(__('All sources')) ?></option>
+        <?php foreach ($sources as $source): ?>
+        <option value="<?= $block->escapeHtmlAttr($source) ?>"<?= ($filters['source'] ?? '') === $source ? ' selected' : '' ?>>
+            <?= $block->escapeHtml($source) ?>
+        </option>
+        <?php endforeach; ?>
+    </select>
+    <select class="modracx-select modracx-activity-filter" data-filter="event">
+        <option value=""><?= $block->escapeHtml(__('All changes')) ?></option>
+        <?php foreach ($actions as $key => $label): ?>
+        <option value="<?= $block->escapeHtmlAttr($key) ?>"<?= ($filters['action'] ?? '') === $key ? ' selected' : '' ?>>
+            <?= $block->escapeHtml($label) ?>
+        </option>
+        <?php endforeach; ?>
+    </select>
+    <input type="text" class="modracx-input modracx-activity-search"
+           value="<?= $block->escapeHtmlAttr($filters['q'] ?? '') ?>"
+           placeholder="<?= $block->escapeHtmlAttr(__('Search entity, endpoint or user…')) ?>"
+           spellcheck="false" autocomplete="off">
+</div>
+
+<div class="modracx-panel-note">
+    <?= $block->escapeHtml(__(
+        'Covers changes made through the admin, REST, SOAP and GraphQL. Writes that bypass the model layer — raw SQL, some mass actions and indexer internals — are not visible here. Entries older than %1 days are pruned nightly.',
+        $retention
+    )) ?>
+</div>
+
+<?php if (empty($entries)): ?>
+<div class="modracx-panel-empty">
+    <?= $total > 0
+        ? $block->escapeHtml(__('No entries match those filters. %1 in total.', $total))
+        : $block->escapeHtml(__('Nothing recorded yet.')) ?>
+</div>
+<?php else: ?>
+<div class="modracx-panel-meta">
+    <?= $block->escapeHtml(__('Showing %1 of %2 entries', count($entries), $total)) ?>
+</div>
+
+<?php foreach ($entries as $entry): ?>
+<div class="modracx-row modracx-stack">
+    <span class="modracx-item-name">
+        <em class="modracx-item-flag modracx-flag-<?= $entry['action'] === 'delete' ? 'err' : ($entry['action'] === 'create' ? 'ok' : 'warn') ?>">
+            <?= $block->escapeHtml($actions[$entry['action']] ?? $entry['action']) ?>
+        </em>
+        <code class="modracx-code"><?= $block->escapeHtml($entry['entity_label'] ?: ($entry['entity_table'] ?: $entry['entity_type'])) ?></code>
+        <?php if ($entry['entity_id'] !== null && $entry['entity_id'] !== ''): ?>
+        <em class="modracx-item-flag"><?= $block->escapeHtml('#' . $entry['entity_id']) ?></em>
+        <?php endif; ?>
+
+        <em class="modracx-item-desc">
+            <?= $block->escapeHtml($entry['logged_at']) ?>
+            ·
+            <?php if ($entry['actor_name']): ?>
+            <?= $block->escapeHtml($entry['actor_name']) ?>
+            <?php else: ?>
+            <?= $block->escapeHtml($entry['actor_type']) ?><?= $entry['actor_id'] ? $block->escapeHtml(' #' . $entry['actor_id']) : '' ?>
+            <?php endif; ?>
+            · <span class="modracx-source modracx-source-<?= $block->escapeHtmlAttr($entry['source']) ?>"><?= $block->escapeHtml($entry['source']) ?></span>
+            <?php if ($entry['endpoint']): ?>
+            <?= $block->escapeHtml($entry['request_method'] ? $entry['request_method'] . ' ' : '') ?><?= $block->escapeHtml($entry['endpoint']) ?>
+            <?php endif; ?>
+            <?php if ($entry['ip']): ?>
+            · <?= $block->escapeHtml($entry['ip']) ?>
+            <?php endif; ?>
+        </em>
+
+        <?php if (!empty($entry['changes'])): ?>
+        <span class="modracx-diff">
+            <?php foreach ($entry['changes'] as $field => $pair): ?>
+            <span class="modracx-diff-row">
+                <span class="modracx-diff-field"><?= $block->escapeHtml((string) $field) ?></span>
+                <span class="modracx-diff-old"><?= $block->escapeHtml((string) ($pair[0] ?? '')) ?></span>
+                <span class="modracx-diff-arrow">→</span>
+                <span class="modracx-diff-new"><?= $block->escapeHtml((string) ($pair[1] ?? '')) ?></span>
+            </span>
+            <?php endforeach; ?>
+        </span>
+        <?php endif; ?>
+    </span>
+</div>
+<?php endforeach; ?>
+<?php endif; ?>
+<?php endif; ?>

@@ -1,0 +1,30 @@
+<?php
+/** @var \Modracx\AdminDevTools\Block\Adminhtml\ReindexButtons $block */
+$indexers = $block->getIndexers();
+?>
+<div class="modracx-panel-head">
+    <span class="modracx-panel-title"><?= $block->escapeHtml(__('Indexers')) ?></span>
+    <div class="modracx-panel-actions">
+        <button type="button" class="modracx-run-btn modracx-panel-refresh"><?= $block->escapeHtml(__('Refresh')) ?></button>
+    </div>
+</div>
+
+<?php if (empty($indexers)): ?>
+<div class="modracx-panel-empty"><?= $block->escapeHtml(__('No indexers registered.')) ?></div>
+<?php else: ?>
+<?php foreach ($indexers as $idx): ?>
+<div class="modracx-row">
+    <span class="modracx-item-name">
+        <?= $block->escapeHtml($idx['title']) ?>
+        <?php if ($idx['status'] !== \Magento\Framework\Indexer\StateInterface::STATUS_VALID): ?>
+        <em class="modracx-item-flag modracx-flag-warn" title="<?= $block->escapeHtmlAttr(__('Index is not up to date')) ?>">
+            <?= $block->escapeHtml($idx['status']) ?>
+        </em>
+        <?php endif; ?>
+        <em class="modracx-item-desc"><code class="modracx-code"><?= $block->escapeHtml($idx['id']) ?></code></em>
+    </span>
+    <button type="button" class="modracx-run-btn modracx-reindex-btn"
+            data-id="<?= $block->escapeHtmlAttr($idx['id']) ?>"><?= $block->escapeHtml(__('Run')) ?></button>
+</div>
+<?php endforeach; ?>
+<?php endif; ?>

@@ -1,0 +1,31 @@
+<?php
+/** @var \Modracx\AdminDevTools\Block\Adminhtml\Panel $block */
+$report = (array) $block->getData('report');
+?>
+<div class="modracx-panel-head">
+    <span class="modracx-panel-title"><?= $block->escapeHtml(__('Report %1', $report['id'])) ?></span>
+    <div class="modracx-panel-actions">
+        <button type="button" class="modracx-run-btn modracx-report-back"><?= $block->escapeHtml(__('Back')) ?></button>
+    </div>
+</div>
+
+<div class="modracx-panel-meta">
+    <?php if ($report['modified'] !== null): ?>
+    <?= $block->escapeHtml(date('Y-m-d H:i:s', (int) $report['modified'])) ?>
+    <?php endif; ?>
+    <?php if ($report['url'] !== ''): ?>
+    · <?= $block->escapeHtml($report['url']) ?>
+    <?php endif; ?>
+    <?php if ($report['script_name'] !== ''): ?>
+    · <?= $block->escapeHtml($report['script_name']) ?>
+    <?php endif; ?>
+</div>
+
+<div class="modracx-verdict modracx-verdict-err"><?= $block->escapeHtml($report['message']) ?></div>
+
+<?php if ($report['trace'] !== ''): ?>
+<div class="modracx-section"><?= $block->escapeHtml(__('Stack trace')) ?></div>
+<pre class="modracx-log"><?= $block->escapeHtml($report['trace']) ?></pre>
+<?php else: ?>
+<div class="modracx-panel-empty"><?= $block->escapeHtml(__('No stack trace stored in this report.')) ?></div>
+<?php endif; ?>

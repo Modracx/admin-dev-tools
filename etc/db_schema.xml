@@ -1,0 +1,39 @@
+<?xml version="1.0"?>
+<schema xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:framework:Setup/Declaration/Schema/etc/schema.xsd">
+    <table name="modracx_activity_log" resource="default" engine="innodb" comment="Modracx backend activity log">
+        <column xsi:type="int" name="log_id" unsigned="true" nullable="false" identity="true" comment="Log ID"/>
+        <column xsi:type="timestamp" name="logged_at" on_update="false" nullable="false" default="CURRENT_TIMESTAMP" comment="When"/>
+
+        <column xsi:type="varchar" name="actor_type" length="20" nullable="false" default="system" comment="admin|integration|customer|system"/>
+        <column xsi:type="int" name="actor_id" unsigned="true" nullable="true" comment="Acting user ID"/>
+        <column xsi:type="varchar" name="actor_name" length="255" nullable="true" comment="Acting user name"/>
+
+        <column xsi:type="varchar" name="source" length="20" nullable="false" default="unknown" comment="admin|rest|soap|graphql|cli|cron"/>
+        <column xsi:type="varchar" name="request_method" length="10" nullable="true" comment="HTTP method"/>
+        <column xsi:type="varchar" name="endpoint" length="255" nullable="true" comment="Admin action name or API route"/>
+        <column xsi:type="varchar" name="ip" length="45" nullable="true" comment="Client IP"/>
+
+        <column xsi:type="varchar" name="action" length="10" nullable="false" comment="create|update|delete"/>
+        <column xsi:type="varchar" name="entity_type" length="255" nullable="false" comment="Model class"/>
+        <column xsi:type="varchar" name="entity_table" length="64" nullable="true" comment="Main table"/>
+        <column xsi:type="varchar" name="entity_id" length="64" nullable="true" comment="Entity primary key"/>
+        <column xsi:type="varchar" name="entity_label" length="255" nullable="true" comment="Human-readable identifier"/>
+
+        <column xsi:type="mediumtext" name="changes" nullable="true" comment="JSON of field =&gt; [old, new]"/>
+
+        <constraint xsi:type="primary" referenceId="PRIMARY">
+            <column name="log_id"/>
+        </constraint>
+
+        <index referenceId="MODRACX_ACTIVITY_LOG_LOGGED_AT" indexType="btree">
+            <column name="logged_at"/>
+        </index>
+        <index referenceId="MODRACX_ACTIVITY_LOG_ACTOR_ID" indexType="btree">
+            <column name="actor_id"/>
+        </index>
+        <index referenceId="MODRACX_ACTIVITY_LOG_ENTITY_TABLE" indexType="btree">
+            <column name="entity_table"/>
+        </index>
+    </table>
+</schema>

@@ -1,0 +1,13 @@
+<?xml version="1.0"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:framework:Event/etc/events.xsd">
+    <event name="model_save_before">
+        <observer name="modracx_activity_capture" instance="Modracx\AdminDevTools\Observer\CaptureModelSave"/>
+    </event>
+    <event name="model_save_after">
+        <observer name="modracx_activity_commit" instance="Modracx\AdminDevTools\Observer\CommitModelSave"/>
+    </event>
+    <event name="model_delete_after">
+        <observer name="modracx_activity_delete" instance="Modracx\AdminDevTools\Observer\LogModelDelete"/>
+    </event>
+</config>
