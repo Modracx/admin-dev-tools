@@ -1,0 +1,609 @@
+<?php
+/**
+ * The launcher/drawer shell and everything shared by its panels.
+ *
+ * Renders no markup itself — devbar_tools.phtml supplies that. This wires the launcher
+ * (drag along the top edge, click to open), the drawer and its tabs, and exposes
+ * window.modracxDevTools.{post,run,load} for the panel templates.
+ */
+?>
+<script>
+(function () {
+    window.modracxDevTools = window.modracxDevTools || {};
+
+    var POSITION_KEY = 'modracx.devtools.x';
+    var TAB_KEY      = 'modracx.devtools.tab';
+    var DRAG_SLOP    = 4;   // px of movement before a press counts as a drag, not a click
+    var EDGE         = 8;   // keep at least this much of the launcher on screen
+
+    /* ── Placement ───────────────────────────────────────────────────────── */
+
+    /**
+     * The shell renders inside the admin header, a positioned subtree — position:fixed
+     * within it resolves against that ancestor rather than the viewport. Moving the
+     * root to <body> is what makes the fixed placement behave.
+     */
+    function relocate() {
+        var root = document.getElementById('modracx-root');
+        if (root && root.parentNode !== document.body) {
+            document.body.appendChild(root);
+        }
+        return root;
+    }
+
+    /**
+     * Horizontal offset from the centre of the content area, clamped so the launcher
+     * stays reachable however narrow the window gets.
+     */
+    function clampX(x, el) {
+        var width  = el.offsetWidth || 130;
+        var centre = window.innerWidth / 2 + 44;   // content area starts after the 88px menu
+        var min    = EDGE + width / 2 - centre;
+        var max    = window.innerWidth - EDGE - width / 2 - centre;
+
+        return Math.max(min, Math.min(max, x));
+    }
+
+    function applyX(x) {
+        document.documentElement.style.setProperty('--modracx-x', x + 'px');
+    }
+
+    function storedX() {
+        try { return parseFloat(window.localStorage.getItem(POSITION_KEY)) || 0; } catch (e) { return 0; }
+    }
+
+    /* ── Launcher: drag horizontally, click to open ──────────────────────── */
+
+    function initLauncher() {
+        var launcher = document.getElementById('modracx-launcher');
+        if (!launcher || launcher.dataset.bound) { return; }
+        launcher.dataset.bound = '1';
+
+        var x = clampX(storedX(), launcher);
+        applyX(x);
+
+        var dragging = false;
+        var moved    = 0;
+        var startX   = 0;
+        var originX  = 0;
+
+        launcher.addEventListener('pointerdown', function (e) {
+            if (e.button !== 0) { return; }
+            dragging = true;
+            moved    = 0;
+            startX   = e.clientX;
+            originX  = x;
+            launcher.setPointerCapture(e.pointerId);
+        });
+
+        launcher.addEventListener('pointermove', function (e) {
+            if (!dragging) { return; }
+            var dx = e.clientX - startX;
+            moved  = Math.max(moved, Math.abs(dx));
+            if (moved < DRAG_SLOP) { return; }
+
+            launcher.classList.add('modracx-dragging');
+            x = clampX(originX + dx, launcher);
+            applyX(x);
+        });
+
+        function endDrag(e) {
+            if (!dragging) { return; }
+            dragging = false;
+            launcher.classList.remove('modracx-dragging');
+            if (launcher.hasPointerCapture && launcher.hasPointerCapture(e.pointerId)) {
+                launcher.releasePointerCapture(e.pointerId);
+            }
+            if (moved >= DRAG_SLOP) {
+                try { window.localStorage.setItem(POSITION_KEY, String(x)); } catch (err) { /* private mode */ }
+            }
+        }
+
+        launcher.addEventListener('pointerup', endDrag);
+        launcher.addEventListener('pointercancel', endDrag);
+
+        // A drag ends in a click event too — only a genuine click should open the drawer.
+        launcher.addEventListener('click', function (e) {
+            if (moved >= DRAG_SLOP) { e.preventDefault(); e.stopPropagation(); moved = 0; return; }
+            openDrawer();
+        });
+
+        window.addEventListener('resize', function () {
+            x = clampX(x, launcher);
+            applyX(x);
+        });
+    }
+
+    /* ── Drawer ──────────────────────────────────────────────────────────── */
+
+    var lastFocused = null;
+
+    function isOpen() {
+        var drawer = document.getElementById('modracx-drawer');
+        return !!drawer && !drawer.hidden;
+    }
+
+    function openDrawer() {
+        var drawer   = document.getElementById('modracx-drawer');
+        var backdrop = document.getElementById('modracx-backdrop');
+        var launcher = document.getElementById('modracx-launcher');
+        if (!drawer || isOpen()) { return; }
+
+        lastFocused = document.activeElement;
+
+        backdrop.hidden = false;
+        drawer.hidden   = false;
+        void drawer.offsetHeight;               // force a frame so the slide-in runs
+        drawer.classList.add('modracx-open');
+        backdrop.classList.add('modracx-open');
+
+        document.body.classList.add('modracx-scroll-lock');
+        launcher.setAttribute('aria-expanded', 'true');
+
+        var active = drawer.querySelector('.modracx-tab-btn.modracx-tab-active') ||
+                     drawer.querySelector('.modracx-tab-btn');
+        if (active) { active.focus(); }
+
+        var panel = document.getElementById('modracx-drawer-panel');
+        if (panel && !panel.dataset.loaded) { load(panel); }
+    }
+
+    function closeDrawer() {
+        var drawer   = document.getElementById('modracx-drawer');
+        var backdrop = document.getElementById('modracx-backdrop');
+        var launcher = document.getElementById('modracx-launcher');
+        if (!drawer || !isOpen()) { return; }
+
+        drawer.classList.remove('modracx-open');
+        backdrop.classList.remove('modracx-open');
+        document.body.classList.remove('modracx-scroll-lock');
+        launcher.setAttribute('aria-expanded', 'false');
+
+        setTimeout(function () {
+            drawer.hidden   = true;
+            backdrop.hidden = true;
+        }, 180);
+
+        if (lastFocused && lastFocused.focus) { lastFocused.focus(); }
+    }
+
+    function initDrawer() {
+        var drawer = document.getElementById('modracx-drawer');
+        if (!drawer || drawer.dataset.bound) { return; }
+        drawer.dataset.bound = '1';
+
+        document.getElementById('modracx-backdrop').addEventListener('click', closeDrawer);
+        document.getElementById('modracx-drawer-close').addEventListener('click', closeDrawer);
+
+        document.addEventListener('keydown', function (e) {
+            if (!isOpen()) { return; }
+            if (e.key === 'Escape') { e.stopPropagation(); closeDrawer(); return; }
+            if (e.key === 'Tab')    { trapFocus(e, drawer); }
+        });
+    }
+
+    /**
+     * Keep Tab inside the drawer while it is modal.
+     */
+    function trapFocus(e, drawer) {
+        var focusable = drawer.querySelectorAll(
+            'button:not([disabled]), input, select, textarea, [href], [tabindex]:not([tabindex="-1"])'
+        );
+        if (!focusable.length) { return; }
+
+        var first = focusable[0];
+        var last  = focusable[focusable.length - 1];
+
+        if (e.shiftKey && document.activeElement === first) {
+            e.preventDefault();
+            last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+            e.preventDefault();
+            first.focus();
+        }
+    }
+
+    /* ── Tabs ────────────────────────────────────────────────────────────── */
+
+    function markActive(tab, tabs) {
+        tabs.forEach(function (t) {
+            var active = t === tab;
+            t.classList.toggle('modracx-tab-active', active);
+            t.setAttribute('aria-selected', active ? 'true' : 'false');
+            t.tabIndex = active ? 0 : -1;
+        });
+    }
+
+    function selectTab(tab, tabs) {
+        var panel = document.getElementById('modracx-drawer-panel');
+        if (!tab || !panel) { return; }
+
+        markActive(tab, tabs);
+        try { window.localStorage.setItem(TAB_KEY, tab.dataset.tab); } catch (e) { /* private mode */ }
+
+        // Switching tabs is always a fresh read — this is diagnostic data.
+        panel.dataset.url    = tab.dataset.url;
+        panel.dataset.params = '{}';
+        delete panel.dataset.viewUrl;
+        load(panel);
+    }
+
+    function initTabs() {
+        var tabs = Array.prototype.slice.call(document.querySelectorAll('.modracx-tab-btn'));
+        if (!tabs.length || tabs[0].dataset.bound) { return; }
+
+        tabs.forEach(function (tab, i) {
+            tab.dataset.bound = '1';
+            tab.addEventListener('click', function () { selectTab(tab, tabs); });
+            tab.addEventListener('keydown', function (e) {
+                var next = null;
+                if (e.key === 'ArrowRight') { next = tabs[(i + 1) % tabs.length]; }
+                if (e.key === 'ArrowLeft')  { next = tabs[(i - 1 + tabs.length) % tabs.length]; }
+                if (e.key === 'Home')       { next = tabs[0]; }
+                if (e.key === 'End')        { next = tabs[tabs.length - 1]; }
+                if (!next) { return; }
+                e.preventDefault();
+                next.focus();
+                selectTab(next, tabs);
+            });
+        });
+
+        // Reopen on the tab last used, if the role still has access to it.
+        var remembered = null;
+        try { remembered = window.localStorage.getItem(TAB_KEY); } catch (e) { remembered = null; }
+
+        if (remembered) {
+            var match = tabs.filter(function (t) { return t.dataset.tab === remembered; })[0];
+            if (match) {
+                markActive(match, tabs);
+                var panel = document.getElementById('modracx-drawer-panel');
+                if (panel) { panel.dataset.url = match.dataset.url; }
+            }
+        }
+    }
+
+    /* ── Transport ───────────────────────────────────────────────────────── */
+
+    /**
+     * POST to a devtools controller. Always resolves — a transport failure comes back
+     * as {success: false} so callers never have to write a second error path.
+     */
+    function post(url, params) {
+        var query = Object.keys(params || {}).map(function (k) {
+            return encodeURIComponent(k) + '=' + encodeURIComponent(params[k]);
+        });
+        query.push('isAjax=true', 'form_key=' + encodeURIComponent(window.FORM_KEY || ''));
+
+        return fetch(url + (url.indexOf('?') === -1 ? '?' : '&') + query.join('&'), {
+            method: 'POST',
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        })
+        .then(function (r) {
+            // An HTML body means the controller died before it could answer; say so
+            // rather than reporting a generic failure.
+            return r.json().catch(function () {
+                return {
+                    success: false,
+                    message: 'Server error (HTTP ' + r.status + ') — see var/log/system.log.'
+                };
+            });
+        })
+        .catch(function () {
+            return { success: false, message: 'Could not reach the server.' };
+        });
+    }
+
+    /**
+     * POSTs and drives a button's busy / ok / error states.
+     *
+     * @param {Element} el      button to animate
+     * @param {string}  url     controller url
+     * @param {Object}  params  query params to send
+     * @param {Object}  [opts]  {labelEl, busyText, okText, errText, resetAfter}
+     * @return {Promise<Object>} resolved JSON response
+     */
+    function run(el, url, params, opts) {
+        opts = opts || {};
+
+        var labelEl = opts.labelEl || el.querySelector('.modracx-btn-label') || el;
+        var orig    = labelEl.textContent.trim();
+
+        el.classList.add('modracx-busy');
+        labelEl.textContent = opts.busyText || '…';
+
+        return post(url, params).then(function (d) {
+            el.classList.remove('modracx-busy');
+            el.classList.add(d.success ? 'modracx-ok' : 'modracx-err');
+            labelEl.textContent = d.success ? (opts.okText || '✓') : (opts.errText || '✗');
+            if (!d.success && d.message) { el.title = d.message; }
+
+            setTimeout(function () {
+                el.classList.remove('modracx-ok', 'modracx-err');
+                labelEl.textContent = orig;
+            }, opts.resetAfter || 2000);
+
+            return d;
+        });
+    }
+
+    /* ── Panels ──────────────────────────────────────────────────────────── */
+
+    /**
+     * Fetch a panel's HTML and drop it into the container.
+     *
+     * @param {Element} panel   element carrying data-url (and optional data-params)
+     * @param {Object}  [extra] params merged over data-params for this request
+     * @param {string}  [url]   fetch this instead of data-url, without changing the tab
+     */
+    function load(panel, extra, url) {
+        var params = {};
+        if (panel.dataset.params) {
+            try { params = JSON.parse(panel.dataset.params); } catch (err) { params = {}; }
+        }
+        Object.keys(extra || {}).forEach(function (k) { params[k] = extra[k]; });
+
+        var target = url || panel.dataset.url;
+
+        panel.dataset.loaded = '1';
+        panel.classList.add('modracx-panel-loading');
+        if (!panel.innerHTML) {
+            panel.innerHTML = '<div class="modracx-panel-empty">Loading…</div>';
+        }
+
+        return post(target, params).then(function (d) {
+            panel.classList.remove('modracx-panel-loading');
+
+            if (d.success && typeof d.html === 'string') {
+                panel.innerHTML = d.html;
+                panel.dataset.params = JSON.stringify(params);
+                if (url) { panel.dataset.viewUrl = url; } else { delete panel.dataset.viewUrl; }
+                initPanel(panel);
+            } else {
+                panel.innerHTML = '<div class="modracx-verdict modracx-verdict-err"></div>';
+                panel.querySelector('.modracx-verdict').textContent = d.message || 'Could not load this panel.';
+            }
+
+            return d;
+        });
+    }
+
+    /**
+     * Reload whatever the panel is currently showing — the tab, or a drilled-in view.
+     */
+    function reload(panel) {
+        return load(panel, {}, panel.dataset.viewUrl);
+    }
+
+    var RUN_OPTS = { busyText: '...', okText: 'Done', errText: 'Err', resetAfter: 2500 };
+
+    /**
+     * Wire the controls inside a freshly rendered panel.
+     */
+    function initPanel(panel) {
+        var urls = window.modracxDevTools.urls || {};
+
+        panel.querySelectorAll('.modracx-panel-refresh').forEach(function (btn) {
+            btn.addEventListener('click', function () { reload(panel); });
+        });
+
+        /* Cache panel */
+        panel.querySelectorAll('.modracx-flush-btn').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                run(btn, urls.cacheFlush, { type: btn.dataset.type }, RUN_OPTS).then(function (d) {
+                    if (!d.success) { return; }
+                    var flag = btn.parentNode.querySelector('.modracx-item-flag.modracx-flag-warn');
+                    if (flag) { flag.parentNode.removeChild(flag); }
+                });
+            });
+        });
+        panel.querySelectorAll('.modracx-action-btn').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                run(btn, urls.cacheAction, { action: btn.dataset.action }, RUN_OPTS);
+            });
+        });
+
+        /* Index panel */
+        panel.querySelectorAll('.modracx-reindex-btn').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                run(btn, urls.indexerRun, { indexer_id: btn.dataset.id }, RUN_OPTS).then(function (d) {
+                    if (!d.success) { return; }
+                    var flag = btn.parentNode.querySelector('.modracx-item-flag');
+                    if (flag) { flag.parentNode.removeChild(flag); }
+                });
+            });
+        });
+
+        /* Log panel */
+        panel.querySelectorAll('.modracx-log-tab, .modracx-log-refresh').forEach(function (btn) {
+            btn.addEventListener('click', function () { load(panel, { file: btn.dataset.file }); });
+        });
+        panel.querySelectorAll('.modracx-log-lines').forEach(function (sel) {
+            sel.addEventListener('change', function () { load(panel, { lines: sel.value }); });
+        });
+        panel.querySelectorAll('.modracx-log-clear').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                run(btn, urls.logClear, { file: btn.dataset.file }, {
+                    busyText: '...', okText: 'Cleared', errText: 'Err', resetAfter: 1500
+                }).then(function (d) {
+                    if (d.success) { setTimeout(function () { load(panel, { file: btn.dataset.file }); }, 600); }
+                });
+            });
+        });
+
+        /* Reports panel — drill in and back out */
+        panel.querySelectorAll('.modracx-report-view').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                load(panel, { id: btn.dataset.id }, urls.reportView);
+            });
+        });
+        panel.querySelectorAll('.modracx-report-back').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                panel.dataset.params = '{}';
+                load(panel);
+            });
+        });
+
+        /* Grids panel */
+        panel.querySelectorAll('.modracx-bookmark-reset').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                run(btn, urls.bookmarkReset, { namespace: btn.dataset.namespace }, {
+                    busyText: '...', okText: 'Reset', errText: 'Err', resetAfter: 2500
+                }).then(function (d) {
+                    if (d.success) { setTimeout(function () { reload(panel); }, 1200); }
+                });
+            });
+        });
+
+        /* Modules panel — two-step, because this rewrites app/etc/config.php */
+        panel.querySelectorAll('.modracx-module-toggle').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                if (btn.dataset.armed !== '1') {
+                    btn.dataset.armed = '1';
+                    btn.dataset.label = btn.textContent.trim();
+                    btn.textContent   = 'Sure?';
+                    btn.classList.add('modracx-armed');
+                    setTimeout(function () {
+                        if (btn.dataset.armed !== '1') { return; }
+                        btn.dataset.armed = '0';
+                        btn.textContent = btn.dataset.label;
+                        btn.classList.remove('modracx-armed');
+                    }, 4000);
+                    return;
+                }
+
+                btn.dataset.armed = '0';
+                btn.classList.remove('modracx-armed');
+                btn.textContent = btn.dataset.label;
+
+                run(btn, urls.moduleToggle, {
+                    module: btn.dataset.module,
+                    enable: btn.dataset.enable
+                }, { busyText: '...', okText: 'Done', errText: 'Err', resetAfter: 4000 }).then(function (d) {
+                    if (d.success) { setTimeout(function () { reload(panel); }, 1500); }
+                });
+            });
+        });
+
+        /* Activity panel — filters reload the panel, clear needs a second click */
+        panel.querySelectorAll('.modracx-activity-filter').forEach(function (sel) {
+            sel.addEventListener('change', function () {
+                var params = {};
+                panel.querySelectorAll('.modracx-activity-filter').forEach(function (s2) {
+                    params[s2.dataset.filter] = s2.value;
+                });
+                var search = panel.querySelector('.modracx-activity-search');
+                if (search) { params.q = search.value; }
+                load(panel, params);
+            });
+        });
+
+        var activitySearch = panel.querySelector('.modracx-activity-search');
+        if (activitySearch) {
+            activitySearch.addEventListener('keydown', function (e) {
+                if (e.key !== 'Enter') { return; }
+                e.preventDefault();
+                var params = { q: activitySearch.value };
+                panel.querySelectorAll('.modracx-activity-filter').forEach(function (s2) {
+                    params[s2.dataset.filter] = s2.value;
+                });
+                load(panel, params);
+            });
+        }
+
+        panel.querySelectorAll('.modracx-activity-clear').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                if (btn.dataset.armed !== '1') {
+                    btn.dataset.armed = '1';
+                    btn.dataset.label = btn.textContent.trim();
+                    btn.textContent  = 'Sure?';
+                    btn.classList.add('modracx-armed');
+                    setTimeout(function () {
+                        if (btn.dataset.armed !== '1') { return; }
+                        btn.dataset.armed = '0';
+                        btn.textContent = btn.dataset.label;
+                        btn.classList.remove('modracx-armed');
+                    }, 4000);
+                    return;
+                }
+
+                btn.dataset.armed = '0';
+                btn.classList.remove('modracx-armed');
+                btn.textContent = btn.dataset.label;
+
+                run(btn, urls.activityClear, {}, {
+                    busyText: '...', okText: 'Cleared', errText: 'Err', resetAfter: 3000
+                }).then(function (d) {
+                    if (d.success) { setTimeout(function () { panel.dataset.params = '{}'; load(panel); }, 1200); }
+                });
+            });
+        });
+
+        /* Config lookup */
+        var input = panel.querySelector('#modracx-config-path');
+        var go    = panel.querySelector('#modracx-config-go');
+        if (input && go) {
+            var submit = function () { load(panel, { path: input.value }); };
+            go.addEventListener('click', submit);
+            input.addEventListener('keydown', function (e) {
+                if (e.key === 'Enter') { e.preventDefault(); submit(); }
+            });
+            input.focus();
+        }
+
+        /* Client-side list filter (modules) */
+        var filter = panel.querySelector('.modracx-filter');
+        if (filter) {
+            var rows  = panel.querySelectorAll('.modracx-filter-row');
+            var empty = panel.querySelector('.modracx-filter-empty');
+            filter.addEventListener('input', function () {
+                var term = filter.value.trim().toLowerCase();
+                var hits = 0;
+                rows.forEach(function (row) {
+                    var match = term === '' || row.dataset.filter.indexOf(term) !== -1;
+                    row.hidden = !match;
+                    if (match) { hits++; }
+                });
+                if (empty) { empty.hidden = hits !== 0; }
+            });
+            filter.focus();
+        }
+    }
+
+    /* ── Cron health dot on the launcher ─────────────────────────────────── */
+
+    function initHealth() {
+        var el = document.getElementById('modracx-health');
+        if (!el || el.dataset.loaded) { return; }
+        el.dataset.loaded = '1';
+
+        post(el.dataset.badgeUrl, {}).then(function (d) {
+            if (!d.success || !d.badge) { return; }
+            el.classList.add('modracx-health-' + d.badge.level);
+            el.title = d.badge.detail || '';
+        });
+    }
+
+    /* ── Boot ────────────────────────────────────────────────────────────── */
+
+    window.modracxDevTools.post  = post;
+    window.modracxDevTools.run   = run;
+    window.modracxDevTools.load  = load;
+    window.modracxDevTools.open  = openDrawer;
+    window.modracxDevTools.close = closeDrawer;
+
+    function init() {
+        if (!relocate()) { return; }
+        initLauncher();
+        initDrawer();
+        initTabs();
+        initHealth();
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+    } else {
+        init();
+    }
+    window.addEventListener('load', init);
+}());
+</script>

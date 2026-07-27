@@ -1,0 +1,45 @@
+<?php
+/** @var \Modracx\AdminDevTools\Block\Adminhtml\Panel $block */
+$data      = (array) $block->getData('reports');
+$reports   = (array) ($data['reports'] ?? []);
+$total     = (int) ($data['total'] ?? 0);
+$truncated = (bool) ($data['truncated'] ?? false);
+$available = (bool) $block->getData('available');
+?>
+<div class="modracx-panel-head">
+    <span class="modracx-panel-title"><?= $block->escapeHtml(__('Exception reports')) ?></span>
+    <div class="modracx-panel-actions">
+        <button type="button" class="modracx-run-btn modracx-panel-refresh"><?= $block->escapeHtml(__('Refresh')) ?></button>
+    </div>
+</div>
+
+<?php if (!$available): ?>
+<div class="modracx-panel-empty">
+    <?= $block->escapeHtml(__('var/report does not exist — no exception reports have been written.')) ?>
+</div>
+<?php elseif (empty($reports)): ?>
+<div class="modracx-panel-empty"><?= $block->escapeHtml(__('No exception reports.')) ?></div>
+<?php else: ?>
+<div class="modracx-panel-meta">
+    <?= $block->escapeHtml(__('%1 report(s), newest first', $total)) ?>
+    <?php if ($truncated): ?>
+    <em class="modracx-item-flag"><?= $block->escapeHtml(__('truncated')) ?></em>
+    <?php endif; ?>
+</div>
+<?php foreach ($reports as $report): ?>
+<div class="modracx-row modracx-report-row" data-id="<?= $block->escapeHtmlAttr($report['id']) ?>">
+    <span class="modracx-item-name">
+        <?= $block->escapeHtml($report['message'] !== '' ? $report['message'] : __('(no message)')) ?>
+        <em class="modracx-item-desc">
+            <code class="modracx-code"><?= $block->escapeHtml($report['id']) ?></code>
+            <?php if ($report['modified'] !== null): ?>
+            · <?= $block->escapeHtml(date('Y-m-d H:i:s', (int) $report['modified'])) ?>
+            <?php endif; ?>
+            · <?= $block->escapeHtml($block->formatBytes((int) $report['size'])) ?>
+        </em>
+    </span>
+    <button type="button" class="modracx-run-btn modracx-report-view"
+            data-id="<?= $block->escapeHtmlAttr($report['id']) ?>"><?= $block->escapeHtml(__('Open')) ?></button>
+</div>
+<?php endforeach; ?>
+<?php endif; ?>

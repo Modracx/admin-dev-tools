@@ -1,0 +1,33 @@
+<?php
+/** @var \Modracx\AdminDevTools\Block\Adminhtml\Panel $block */
+$namespaces = (array) $block->getData('namespaces');
+?>
+<div class="modracx-panel-head">
+    <span class="modracx-panel-title"><?= $block->escapeHtml(__('Your saved grid state')) ?></span>
+    <div class="modracx-panel-actions">
+        <button type="button" class="modracx-run-btn modracx-panel-refresh"><?= $block->escapeHtml(__('Refresh')) ?></button>
+    </div>
+</div>
+
+<?php if (empty($namespaces)): ?>
+<div class="modracx-panel-empty"><?= $block->escapeHtml(__('You have no saved grid views, filters or column layouts.')) ?></div>
+<?php else: ?>
+<div class="modracx-panel-note">
+    <?= $block->escapeHtml(__('Resetting removes your saved views, column layout and filters for that grid. Other users are not affected.')) ?>
+</div>
+<?php foreach ($namespaces as $namespace): ?>
+<div class="modracx-row" data-namespace="<?= $block->escapeHtmlAttr($namespace['namespace']) ?>">
+    <span class="modracx-item-name">
+        <code class="modracx-code"><?= $block->escapeHtml($namespace['namespace']) ?></code>
+        <em class="modracx-item-desc">
+            <?= $block->escapeHtml(__('%1 saved view(s)', $namespace['views'])) ?>
+            <?php if ($namespace['updated_at'] !== null): ?>
+            · <?= $block->escapeHtml($namespace['updated_at']) ?>
+            <?php endif; ?>
+        </em>
+    </span>
+    <button type="button" class="modracx-run-btn modracx-danger-btn modracx-bookmark-reset"
+            data-namespace="<?= $block->escapeHtmlAttr($namespace['namespace']) ?>"><?= $block->escapeHtml(__('Reset')) ?></button>
+</div>
+<?php endforeach; ?>
+<?php endif; ?>

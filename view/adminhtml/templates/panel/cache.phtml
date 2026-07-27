@@ -1,0 +1,47 @@
+<?php
+/** @var \Modracx\AdminDevTools\Block\Adminhtml\CacheButtons $block */
+$cacheTypes   = $block->getCacheTypes();
+$cacheActions = $block->getCacheActions();
+?>
+<div class="modracx-panel-head">
+    <span class="modracx-panel-title"><?= $block->escapeHtml(__('Flush')) ?></span>
+    <div class="modracx-panel-actions">
+        <button type="button" class="modracx-run-btn modracx-panel-refresh"><?= $block->escapeHtml(__('Refresh')) ?></button>
+    </div>
+</div>
+
+<?php if (!empty($cacheActions)): ?>
+<div class="modracx-section"><?= $block->escapeHtml(__('Additional Cache Management')) ?></div>
+<?php foreach ($cacheActions as $action): ?>
+<div class="modracx-row">
+    <span class="modracx-item-name">
+        <?= $block->escapeHtml(__($action['label'])) ?>
+        <em class="modracx-item-desc"><?= $block->escapeHtml(__($action['description'])) ?></em>
+    </span>
+    <button type="button" class="modracx-run-btn modracx-action-btn"
+            data-action="<?= $block->escapeHtmlAttr($action['id']) ?>"><?= $block->escapeHtml(__('Flush')) ?></button>
+</div>
+<?php endforeach; ?>
+<?php endif; ?>
+
+<?php if (!empty($cacheTypes)): ?>
+<div class="modracx-section"><?= $block->escapeHtml(__('Cache Types')) ?></div>
+<?php foreach ($cacheTypes as $type): ?>
+<div class="modracx-row">
+    <span class="modracx-item-name">
+        <?= $block->escapeHtml($type['label']) ?>
+        <?php if (!$type['enabled']): ?>
+        <em class="modracx-item-flag" title="<?= $block->escapeHtmlAttr(__('Cache type is disabled')) ?>"><?= $block->escapeHtml(__('off')) ?></em>
+        <?php elseif ($type['invalidated']): ?>
+        <em class="modracx-item-flag modracx-flag-warn" title="<?= $block->escapeHtmlAttr(__('Cache type is invalidated')) ?>"><?= $block->escapeHtml(__('stale')) ?></em>
+        <?php endif; ?>
+    </span>
+    <button type="button" class="modracx-run-btn modracx-flush-btn"
+            data-type="<?= $block->escapeHtmlAttr($type['id']) ?>"><?= $block->escapeHtml(__('Flush')) ?></button>
+</div>
+<?php endforeach; ?>
+<?php endif; ?>
+
+<?php if (empty($cacheTypes) && empty($cacheActions)): ?>
+<div class="modracx-panel-empty"><?= $block->escapeHtml(__('You do not have permission to flush any cache.')) ?></div>
+<?php endif; ?>

@@ -1,0 +1,608 @@
+/* ============================================================
+   MODRACX ADMIN DEV TOOLS
+   A launcher pill parked on the top edge, and the drawer it
+   opens. Panel primitives (rows, sections, chips) follow.
+   ============================================================ */
+
+:root {
+    /* Warm neutrals — every surface derives from the launcher colour so the
+       drawer reads as the same object opening, not a separate panel. */
+    --mdx-bar:        #2b2622;
+    --mdx-surface:    #332d28;
+    --mdx-surface-2:  #3b342e;
+    --mdx-line:       rgba(255,255,255,.08);
+    --mdx-line-mid:   rgba(255,255,255,.14);
+    --mdx-fg:         rgba(255,255,255,.75);
+    --mdx-fg-dim:     rgba(255,255,255,.45);
+    --mdx-fg-faint:   rgba(255,255,255,.3);
+    /* Warm amber accent, in the same family as the shell */
+    --mdx-accent:     #f0c07a;
+    --mdx-accent-bg:  rgba(224,164,76,.18);
+    --mdx-accent-line:rgba(224,164,76,.35);
+    --mdx-ok:         #6ee7b7;
+    --mdx-err:        #fca5a5;
+
+    /* Horizontal offset from the centre of the content area; set by the drag handler. */
+    --modracx-x: 0px;
+
+    /* Layering, chosen against Magento's own scale rather than "a big number":
+         398  grid sticky header
+         501  .page-actions._fixed — the pinned Save/Add New bar
+         700  admin menu and its flyouts
+         899  modal overlay
+       The parked launcher sits above the action bar but below the menu, so it can
+       never cover an open flyout. The drawer sits above the menu but below modals,
+       so a Magento confirm dialog is never trapped behind it. */
+    --modracx-z-launcher: 650;
+    --modracx-z-drawer:   880;
+}
+
+/* The shell is moved to <body> on init; nothing here should affect page flow. */
+.modracx-root {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+body.modracx-scroll-lock {
+    overflow: hidden;
+}
+
+/* ── Launcher ────────────────────────────────────────────────────────────── */
+
+.modracx-launcher {
+    position: fixed;
+    top: 0;
+    /* The content area starts after the 88px menu, so its optical centre is
+       50vw + 44px — plain 50% reads as visibly left of centre. */
+    left: calc(50% + 44px + var(--modracx-x));
+    transform: translateX(-50%);
+    z-index: var(--modracx-z-launcher);
+
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 24px;
+    padding: 0 10px;
+    font-size: 9.5px;
+    font-weight: 700;
+    letter-spacing: 1.4px;
+    /* Solid, not dimmed. An earlier pass faded this to 45% for unobtrusiveness, which
+       made a dark pill on Magento's light header effectively invisible. */
+    color: rgba(255,255,255,.88);
+    background: var(--mdx-bar);
+    border: 1px solid rgba(0,0,0,.35);
+    border-top: none;
+    border-bottom-left-radius: 6px;
+    border-bottom-right-radius: 6px;
+    box-shadow: 0 2px 10px rgba(0,0,0,.35);
+    cursor: pointer;
+    user-select: none;
+    touch-action: none;                 /* let the pointer handler own horizontal drags */
+    transition: background .15s, color .15s, height .15s, box-shadow .15s;
+}
+.modracx-launcher:hover,
+.modracx-launcher:focus-visible,
+.modracx-launcher[aria-expanded="true"] {
+    color: #fff;
+    background: var(--mdx-surface-2);
+    height: 28px;
+    box-shadow: 0 3px 14px rgba(0,0,0,.45);
+    outline: none;
+}
+.modracx-launcher:focus-visible {
+    border-color: var(--mdx-accent-line);
+}
+.modracx-launcher.modracx-dragging {
+    cursor: grabbing;
+    transition: none;                   /* follow the pointer exactly */
+}
+.modracx-launcher-label { line-height: 1; }
+.modracx-launcher .modracx-caret { opacity: .75; }
+
+/* Cron health dot — the one signal visible without opening anything */
+.modracx-health {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: rgba(255,255,255,.5);   /* visible while the health check is still in flight */
+    flex-shrink: 0;
+}
+.modracx-health-ok   { background: var(--mdx-ok); }
+.modracx-health-warn { background: var(--mdx-accent); }
+.modracx-health-err  {
+    background: var(--mdx-err);
+    box-shadow: 0 0 0 3px rgba(252,165,165,.25);
+}
+
+/* ── Drawer ──────────────────────────────────────────────────────────────── */
+
+.modracx-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: calc(var(--modracx-z-drawer) - 1);
+    background: rgba(0,0,0,.45);
+    opacity: 0;
+    transition: opacity .18s ease;
+}
+.modracx-backdrop.modracx-open { opacity: 1; }
+
+.modracx-drawer {
+    position: fixed;
+    top: 0;
+    left: calc(50% + 44px);
+    transform: translateX(-50%) translateY(-100%);
+    z-index: var(--modracx-z-drawer);
+
+    display: flex;
+    flex-direction: column;
+    width: min(1180px, 94vw);
+    max-height: 78vh;
+    background: var(--mdx-surface);
+    border: 1px solid var(--mdx-line-mid);
+    border-top: none;
+    border-bottom-left-radius: 10px;
+    border-bottom-right-radius: 10px;
+    box-shadow: 0 16px 48px rgba(0,0,0,.55), 0 2px 8px rgba(0,0,0,.35);
+    opacity: 0;
+    transition: transform .18s ease, opacity .18s ease;
+}
+.modracx-drawer.modracx-open {
+    transform: translateX(-50%) translateY(0);
+    opacity: 1;
+}
+
+.modracx-drawer-head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-shrink: 0;
+    padding: 0 10px 0 14px;
+    height: 42px;
+    background: var(--mdx-bar);
+    border-bottom: 1px solid var(--mdx-line);
+    border-bottom-left-radius: 0;
+}
+.modracx-drawer-brand {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    color: var(--mdx-fg-faint);
+    white-space: nowrap;
+    user-select: none;
+}
+
+/* Horizontal tab strip; scrolls rather than wraps if tabs outgrow the width */
+.modracx-drawer-tabs {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+.modracx-drawer-tabs::-webkit-scrollbar { display: none; }
+
+.modracx-tab-btn {
+    flex-shrink: 0;
+    padding: 5px 11px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--mdx-fg-dim);
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 5px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background .12s, color .12s, border-color .12s;
+}
+.modracx-tab-btn:hover { color: #fff; background: rgba(255,255,255,.08); }
+.modracx-tab-btn:focus-visible {
+    outline: none;
+    border-color: var(--mdx-accent-line);
+}
+.modracx-tab-btn.modracx-tab-active {
+    color: var(--mdx-accent);
+    background: var(--mdx-accent-bg);
+    border-color: var(--mdx-accent-line);
+}
+
+.modracx-drawer-close {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    color: var(--mdx-fg-dim);
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background .12s, color .12s;
+}
+.modracx-drawer-close:hover { color: #fff; background: rgba(255,255,255,.1); }
+
+.modracx-drawer-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255,255,255,.22) transparent;
+}
+.modracx-drawer-body::-webkit-scrollbar { width: 6px; height: 6px; }
+.modracx-drawer-body::-webkit-scrollbar-track,
+.modracx-drawer-body::-webkit-scrollbar-corner { background: transparent; }
+.modracx-drawer-body::-webkit-scrollbar-thumb {
+    background: rgba(255,255,255,.18);
+    border-radius: 3px;
+}
+.modracx-drawer-body::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,.32); }
+
+/* Narrow screens: the menu offset stops being meaningful, so centre on the viewport */
+@media (max-width: 1024px) {
+    .modracx-launcher { left: calc(50% + var(--modracx-x)); }
+    .modracx-drawer   { left: 50%; width: 96vw; max-height: 85vh; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .modracx-drawer, .modracx-backdrop, .modracx-launcher { transition: none; }
+}
+
+/* ── Buttons used inside panels ──────────────────────────────────────────── */
+
+.modracx-btn-label { font-size: 11px; }
+
+/* Sticky section header so it stays readable while scrolling */
+.modracx-section {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    padding: 8px 12px 6px;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 1.2px;
+    text-transform: uppercase;
+    color: var(--mdx-fg-faint);
+    background: var(--mdx-surface);
+    border-bottom: 1px solid rgba(255,255,255,.07);
+}
+/* Section headers after the first need a little breathing room */
+.modracx-row + .modracx-section {
+    margin-top: 4px;
+    border-top: 1px solid rgba(255,255,255,.07);
+}
+
+.modracx-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    padding: 7px 12px;
+    border-bottom: 1px solid rgba(255,255,255,.05);
+    transition: background .12s;
+}
+.modracx-row:last-child { border-bottom: none; }
+.modracx-row:hover { background: rgba(255,255,255,.05); }
+
+.modracx-item-name {
+    font-size: 12px;
+    color: var(--mdx-fg);
+}
+
+/* Secondary line under an item name (what the action actually clears) */
+.modracx-item-desc {
+    display: block;
+    margin-top: 2px;
+    font-size: 10px;
+    font-style: normal;
+    line-height: 1.35;
+    color: var(--mdx-fg-faint);
+}
+
+/* Small "off" / "stale" badge next to an item name */
+.modracx-item-flag {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 1px 5px;
+    font-size: 9px;
+    font-style: normal;
+    font-weight: 700;
+    letter-spacing: .5px;
+    text-transform: uppercase;
+    color: var(--mdx-fg-dim);
+    background: rgba(255,255,255,.08);
+    border-radius: 3px;
+    vertical-align: middle;
+}
+.modracx-item-flag.modracx-flag-warn {
+    color: var(--mdx-accent);
+    background: var(--mdx-accent-bg);
+}
+
+/* Per-row action button inside a dropdown */
+.modracx-run-btn {
+    flex-shrink: 0;
+    padding: 3px 10px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: .3px;
+    color: var(--mdx-accent);
+    background: var(--mdx-accent-bg);
+    border: 1px solid var(--mdx-accent-line);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background .12s, border-color .12s, color .12s;
+}
+.modracx-run-btn:hover {
+    background: rgba(224,164,76,.3);
+    border-color: rgba(224,164,76,.55);
+    color: #ffd9a0;
+}
+.modracx-run-btn.modracx-busy { opacity: .5; pointer-events: none; }
+.modracx-run-btn.modracx-ok   { background: rgba(52,211,153,.25); color: var(--mdx-ok);  border-color: rgba(52,211,153,.4); }
+.modracx-run-btn.modracx-err  { background: rgba(252,165,165,.2); color: var(--mdx-err); border-color: rgba(252,165,165,.35); }
+
+/* ============================================================
+   PANELS — log tail, cron health, config inspection, bookmarks
+   ============================================================ */
+
+
+/* Panel chrome */
+.modracx-panel-head {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 8px 12px;
+    background: var(--mdx-surface);
+    border-bottom: 1px solid var(--mdx-line);
+}
+.modracx-panel-title {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--mdx-fg-faint);
+}
+.modracx-panel-actions {
+    display: flex;
+    gap: 6px;
+    flex-shrink: 0;
+}
+.modracx-panel-loading { opacity: .55; }
+.modracx-panel-empty {
+    padding: 12px;
+    font-size: 11px;
+    line-height: 1.5;
+    color: var(--mdx-fg-faint);
+}
+.modracx-panel-note {
+    padding: 8px 12px;
+    font-size: 10px;
+    line-height: 1.5;
+    color: var(--mdx-fg-faint);
+    border-bottom: 1px solid var(--mdx-line);
+}
+.modracx-panel-meta {
+    padding: 6px 12px;
+    font-size: 10px;
+    color: var(--mdx-fg-faint);
+}
+
+/* Destructive action (clear log, reset bookmarks) */
+.modracx-run-btn.modracx-danger-btn {
+    color: var(--mdx-err);
+    background: rgba(252,165,165,.14);
+    border-color: rgba(252,165,165,.3);
+}
+.modracx-run-btn.modracx-danger-btn:hover {
+    background: rgba(252,165,165,.26);
+    border-color: rgba(252,165,165,.5);
+    color: #ffc9c9;
+}
+
+/* Tabs (log file switcher) */
+.modracx-tabs {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+}
+.modracx-tab {
+    padding: 3px 9px;
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--mdx-fg-dim);
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background .12s, color .12s, border-color .12s;
+}
+.modracx-tab:hover { color: #fff; background: rgba(255,255,255,.08); }
+.modracx-tab.modracx-tab-active {
+    color: var(--mdx-accent);
+    background: var(--mdx-accent-bg);
+    border-color: var(--mdx-accent-line);
+}
+
+/* Log output */
+.modracx-log {
+    margin: 0;
+    padding: 8px 12px 12px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 10.5px;
+    line-height: 1.5;
+    color: rgba(255,255,255,.62);
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+.modracx-log-line { display: block; }
+.modracx-log-err  { color: #fca5a5; }
+.modracx-log-warn { color: #fcd34d; }
+
+/* Verdict strip (cron health summary, lookup errors) */
+.modracx-verdict {
+    padding: 8px 12px;
+    font-size: 11px;
+    line-height: 1.45;
+    border-bottom: 1px solid var(--mdx-line);
+}
+.modracx-verdict-ok   { color: var(--mdx-ok);     background: rgba(52,211,153,.08); }
+.modracx-verdict-warn { color: var(--mdx-accent); background: rgba(224,164,76,.08); }
+.modracx-verdict-err  { color: var(--mdx-err);    background: rgba(252,165,165,.08); }
+
+/* Status count chips */
+.modracx-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--mdx-line);
+}
+.modracx-chip {
+    padding: 2px 7px;
+    font-size: 10px;
+    color: var(--mdx-fg-dim);
+    background: rgba(255,255,255,.07);
+    border-radius: 10px;
+}
+.modracx-chip b { color: var(--mdx-fg); font-weight: 700; }
+.modracx-chip-error   { background: rgba(252,165,165,.16); color: var(--mdx-err); }
+.modracx-chip-missed  { background: var(--mdx-accent-bg);  color: var(--mdx-accent); }
+.modracx-chip-success { background: rgba(52,211,153,.14);  color: var(--mdx-ok); }
+
+/* Items that stack rather than sit side by side */
+.modracx-row.modracx-stack {
+    display: block;
+}
+.modracx-item-counts {
+    display: flex;
+    gap: 4px;
+    flex-shrink: 0;
+}
+.modracx-item-flag.modracx-flag-err {
+    color: var(--mdx-err);
+    background: rgba(252,165,165,.16);
+}
+
+/* Config values and paths */
+.modracx-code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 11px;
+    color: var(--mdx-fg);
+}
+.modracx-value {
+    display: block;
+    margin-top: 3px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 10.5px;
+    font-style: normal;
+    line-height: 1.4;
+    color: rgba(255,255,255,.55);
+    word-break: break-all;
+}
+.modracx-value-masked { color: var(--mdx-fg-faint); letter-spacing: 1px; }
+.modracx-value-unset  { color: var(--mdx-fg-faint); font-style: italic; }
+
+/* Lookup form */
+.modracx-panel-form {
+    display: flex;
+    gap: 6px;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--mdx-line);
+}
+.modracx-input {
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: 5px 8px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 11px;
+    color: #fff;
+    background: rgba(0,0,0,.25);
+    border: 1px solid var(--mdx-line-mid);
+    border-radius: 4px;
+}
+.modracx-input:focus {
+    outline: none;
+    border-color: var(--mdx-accent-line);
+    box-shadow: 0 0 0 2px rgba(224,164,76,.15);
+}
+.modracx-input::placeholder { color: rgba(255,255,255,.25); }
+/* Filterable list (modules) */
+.modracx-filter-row[hidden] { display: none; }
+
+/* Compact select (log line count) */
+.modracx-select {
+    padding: 3px 6px;
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--mdx-fg);
+    background: rgba(0,0,0,.25);
+    border: 1px solid var(--mdx-line-mid);
+    border-radius: 4px;
+    cursor: pointer;
+}
+.modracx-select:focus { outline: none; border-color: var(--mdx-accent-line); }
+.modracx-select option { background: var(--mdx-surface); color: var(--mdx-fg); }
+
+/* A destructive button waiting for its second click */
+.modracx-run-btn.modracx-armed {
+    color: #1a1512;
+    background: var(--mdx-err);
+    border-color: var(--mdx-err);
+}
+
+/* ── Activity log ────────────────────────────────────────────────────────── */
+
+.modracx-source {
+    display: inline-block;
+    padding: 0 4px;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: .4px;
+    text-transform: uppercase;
+    color: var(--mdx-fg-dim);
+    background: rgba(255,255,255,.08);
+    border-radius: 3px;
+}
+.modracx-source-admin   { color: #93c5fd; background: rgba(96,165,250,.15); }
+.modracx-source-rest,
+.modracx-source-soap,
+.modracx-source-graphql { color: var(--mdx-accent); background: var(--mdx-accent-bg); }
+.modracx-source-cli,
+.modracx-source-cron    { color: var(--mdx-fg-dim); }
+
+.modracx-diff {
+    display: block;
+    margin-top: 5px;
+    padding-left: 8px;
+    border-left: 2px solid var(--mdx-line-mid);
+}
+.modracx-diff-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 5px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 10.5px;
+    line-height: 1.6;
+}
+.modracx-diff-field {
+    color: var(--mdx-fg-dim);
+    min-width: 120px;
+}
+.modracx-diff-old {
+    color: var(--mdx-err);
+    text-decoration: line-through;
+    text-decoration-color: rgba(252,165,165,.45);
+    word-break: break-all;
+}
+.modracx-diff-arrow { color: var(--mdx-fg-faint); }
+.modracx-diff-new {
+    color: var(--mdx-ok);
+    word-break: break-all;
+}

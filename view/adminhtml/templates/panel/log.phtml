@@ -1,0 +1,56 @@
+<?php
+/** @var \Modracx\AdminDevTools\Block\Adminhtml\Panel $block */
+$files    = (array) $block->getData('files');
+$current  = (string) $block->getData('file');
+$tail     = (array) $block->getData('tail');
+$canClear = (bool) $block->getData('can_clear');
+$lines    = (int) $block->getData('lines');
+$choices  = (array) $block->getData('choices');
+?>
+<div class="modracx-panel-head">
+    <div class="modracx-tabs">
+        <?php foreach ($files as $id => $name): ?>
+        <button type="button"
+                class="modracx-tab modracx-log-tab<?= $id === $current ? ' modracx-tab-active' : '' ?>"
+                data-file="<?= $block->escapeHtmlAttr($id) ?>"><?= $block->escapeHtml($name) ?></button>
+        <?php endforeach; ?>
+    </div>
+    <div class="modracx-panel-actions">
+        <select class="modracx-select modracx-log-lines" title="<?= $block->escapeHtmlAttr(__('Lines to show')) ?>">
+            <?php foreach ($choices as $choice): ?>
+            <option value="<?= $block->escapeHtmlAttr((string) $choice) ?>"<?= (int) $choice === $lines ? ' selected' : '' ?>>
+                <?= $block->escapeHtml(__('%1 lines', $choice)) ?>
+            </option>
+            <?php endforeach; ?>
+        </select>
+        <button type="button" class="modracx-run-btn modracx-log-refresh"
+                data-file="<?= $block->escapeHtmlAttr($current) ?>"><?= $block->escapeHtml(__('Refresh')) ?></button>
+        <?php if ($canClear): ?>
+        <button type="button" class="modracx-run-btn modracx-danger-btn modracx-log-clear"
+                data-file="<?= $block->escapeHtmlAttr($current) ?>"><?= $block->escapeHtml(__('Clear')) ?></button>
+        <?php endif; ?>
+    </div>
+</div>
+
+<?php if (!$tail['exists']): ?>
+<div class="modracx-panel-empty"><?= $block->escapeHtml(__('%1 does not exist.', $tail['name'])) ?></div>
+<?php elseif (empty($tail['lines'])): ?>
+<div class="modracx-panel-empty"><?= $block->escapeHtml(__('%1 is empty.', $tail['name'])) ?></div>
+<?php else: ?>
+<div class="modracx-panel-meta">
+    <?= $block->escapeHtml(__(
+        '%1 — %2, last %3 line(s)',
+        $tail['name'],
+        $block->formatBytes((int) $tail['size']),
+        count($tail['lines'])
+    )) ?>
+    <?php if ($tail['truncated']): ?>
+    <em class="modracx-item-flag"><?= $block->escapeHtml(__('truncated')) ?></em>
+    <?php endif; ?>
+</div>
+<pre class="modracx-log"><?php foreach ($tail['lines'] as $line): ?><span class="modracx-log-line<?php
+    $level = $block->getLineLevel($line);
+    echo $level !== '' ? ' modracx-log-' . $block->escapeHtmlAttr($level) : '';
+?>"><?= $block->escapeHtml($line) ?></span>
+<?php endforeach; ?></pre>
+<?php endif; ?>

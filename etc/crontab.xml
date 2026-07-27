@@ -1,0 +1,9 @@
+<?xml version="1.0"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:framework:Cron/etc/crontab.xsd">
+    <group id="default">
+        <job name="modracx_prune_activity_log" instance="Modracx\AdminDevTools\Cron\PruneActivityLog" method="execute">
+            <schedule>27 3 * * *</schedule>
+        </job>
+    </group>
+</config>

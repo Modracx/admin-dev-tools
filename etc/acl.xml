@@ -1,0 +1,32 @@
+<?xml version="1.0"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:framework:Acl/etc/acl.xsd">
+    <acl>
+        <resources>
+            <resource id="Magento_Backend::admin">
+                <resource id="Modracx_AdminDevTools::dev_tools" title="Modracx Admin Dev Tools" sortOrder="100">
+                    <resource id="Modracx_AdminDevTools::cache_flush" title="Cache Flush Buttons" sortOrder="10">
+                        <resource id="Modracx_AdminDevTools::flush_config" title="Flush Config Cache" sortOrder="10"/>
+                        <resource id="Modracx_AdminDevTools::flush_block" title="Flush Block HTML Cache" sortOrder="20"/>
+                        <resource id="Modracx_AdminDevTools::flush_fpc" title="Flush Full Page Cache" sortOrder="30"/>
+                        <resource id="Modracx_AdminDevTools::flush_other" title="Flush Other Cache Types" sortOrder="40"/>
+                    </resource>
+                    <resource id="Modracx_AdminDevTools::reindex" title="Quick Reindex" sortOrder="20"/>
+                    <resource id="Modracx_AdminDevTools::logs" title="View Log Tail" sortOrder="30">
+                        <resource id="Modracx_AdminDevTools::logs_clear" title="Clear Log Files" sortOrder="10"/>
+                    </resource>
+                    <resource id="Modracx_AdminDevTools::reports" title="View Exception Reports" sortOrder="35"/>
+                    <resource id="Modracx_AdminDevTools::cron_health" title="Cron and Queue Health" sortOrder="40"/>
+                    <resource id="Modracx_AdminDevTools::modules" title="Module Status" sortOrder="45">
+                        <resource id="Modracx_AdminDevTools::modules_toggle" title="Enable/Disable Modules" sortOrder="10"/>
+                    </resource>
+                    <resource id="Modracx_AdminDevTools::config_inspect" title="Inspect Configuration" sortOrder="50"/>
+                    <resource id="Modracx_AdminDevTools::activity" title="View Activity Log" sortOrder="55">
+                        <resource id="Modracx_AdminDevTools::activity_clear" title="Clear Activity Log" sortOrder="10"/>
+                    </resource>
+                    <resource id="Modracx_AdminDevTools::grid_bookmarks" title="Reset Own Grid Bookmarks" sortOrder="60"/>
+                </resource>
+            </resource>
+        </resources>
+    </acl>
+</config>

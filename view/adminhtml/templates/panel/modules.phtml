@@ -1,0 +1,77 @@
+<?php
+use Modracx\AdminDevTools\Model\ModuleStatus;
+
+/** @var \Modracx\AdminDevTools\Block\Adminhtml\Panel $block */
+$modules    = (array) $block->getData('modules');
+$summary    = (array) $block->getData('summary');
+$canToggle  = (bool) $block->getData('can_toggle');
+$toggleNote = (string) $block->getData('toggle_note');
+?>
+<div class="modracx-panel-head">
+    <span class="modracx-panel-title"><?= $block->escapeHtml(__('Modules')) ?></span>
+    <div class="modracx-panel-actions">
+        <button type="button" class="modracx-run-btn modracx-panel-refresh"><?= $block->escapeHtml(__('Refresh')) ?></button>
+    </div>
+</div>
+
+<div class="modracx-chips">
+    <span class="modracx-chip"><?= $block->escapeHtml(__('total')) ?> <b><?= $block->escapeHtml((string) ($summary['total'] ?? 0)) ?></b></span>
+    <span class="modracx-chip modracx-chip-success"><?= $block->escapeHtml(__('enabled')) ?> <b><?= $block->escapeHtml((string) ($summary['enabled'] ?? 0)) ?></b></span>
+    <span class="modracx-chip"><?= $block->escapeHtml(__('disabled')) ?> <b><?= $block->escapeHtml((string) ($summary['disabled'] ?? 0)) ?></b></span>
+    <?php if (($summary['attention'] ?? 0) > 0): ?>
+    <span class="modracx-chip modracx-chip-error"><?= $block->escapeHtml(__('needs setup:upgrade')) ?> <b><?= $block->escapeHtml((string) $summary['attention']) ?></b></span>
+    <?php endif; ?>
+</div>
+
+<?php if ($toggleNote !== ''): ?>
+<div class="modracx-panel-note"><?= $block->escapeHtml($toggleNote) ?></div>
+<?php elseif ($canToggle): ?>
+<div class="modracx-panel-note">
+    <?= $block->escapeHtml(__('Enabling or disabling writes app/etc/config.php. Run bin/magento setup:upgrade afterwards; modules other modules depend on cannot be disabled.')) ?>
+</div>
+<?php endif; ?>
+
+<div class="modracx-panel-form">
+    <input type="text" class="modracx-input modracx-filter" id="modracx-module-filter"
+           placeholder="<?= $block->escapeHtmlAttr(__('Filter by name…')) ?>"
+           spellcheck="false" autocomplete="off">
+</div>
+
+<?php if (empty($modules)): ?>
+<div class="modracx-panel-empty"><?= $block->escapeHtml(__('No modules found.')) ?></div>
+<?php else: ?>
+<div class="modracx-filter-list">
+<?php foreach ($modules as $module): ?>
+<div class="modracx-row modracx-filter-row" data-filter="<?= $block->escapeHtmlAttr(strtolower($module['name'])) ?>">
+    <span class="modracx-item-name">
+        <code class="modracx-code"><?= $block->escapeHtml($module['name']) ?></code>
+        <?php if ($module['state'] === ModuleStatus::STATE_DISABLED): ?>
+        <em class="modracx-item-flag"><?= $block->escapeHtml(__('off')) ?></em>
+        <?php elseif ($module['state'] !== ModuleStatus::STATE_OK): ?>
+        <em class="modracx-item-flag modracx-flag-err"><?= $block->escapeHtml(__('upgrade')) ?></em>
+        <?php endif; ?>
+        <?php if ($module['note'] !== ''): ?>
+        <em class="modracx-item-desc"><?= $block->escapeHtml($module['note']) ?></em>
+        <?php elseif ($module['setup_version'] !== null): ?>
+        <em class="modracx-item-desc"><?= $block->escapeHtml(__('version %1', $module['setup_version'])) ?></em>
+        <?php endif; ?>
+    </span>
+
+    <?php if ($canToggle): ?>
+        <?php if ($module['enabled'] && !empty($module['protected'])): ?>
+        <em class="modracx-item-flag" title="<?= $block->escapeHtmlAttr(__('Disabling this would lock you out of the admin')) ?>"><?= $block->escapeHtml(__('locked')) ?></em>
+        <?php elseif ($module['enabled']): ?>
+        <button type="button" class="modracx-run-btn modracx-danger-btn modracx-module-toggle"
+                data-module="<?= $block->escapeHtmlAttr($module['name']) ?>"
+                data-enable="0"><?= $block->escapeHtml(__('Disable')) ?></button>
+        <?php else: ?>
+        <button type="button" class="modracx-run-btn modracx-module-toggle"
+                data-module="<?= $block->escapeHtmlAttr($module['name']) ?>"
+                data-enable="1"><?= $block->escapeHtml(__('Enable')) ?></button>
+        <?php endif; ?>
+    <?php endif; ?>
+</div>
+<?php endforeach; ?>
+</div>
+<div class="modracx-panel-empty modracx-filter-empty" hidden><?= $block->escapeHtml(__('No modules match that filter.')) ?></div>
+<?php endif; ?>

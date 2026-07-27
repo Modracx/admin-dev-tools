@@ -1,0 +1,32 @@
+<?php
+/** @var \Modracx\AdminDevTools\Block\Adminhtml\Panel $block */
+$changes = (array) $block->getData('changes');
+?>
+<div class="modracx-panel-head">
+    <span class="modracx-panel-title"><?= $block->escapeHtml(__('Recently changed configuration')) ?></span>
+    <div class="modracx-panel-actions">
+        <button type="button" class="modracx-run-btn modracx-panel-refresh"><?= $block->escapeHtml(__('Refresh')) ?></button>
+    </div>
+</div>
+
+<?php if (empty($changes)): ?>
+<div class="modracx-panel-empty"><?= $block->escapeHtml(__('No configuration rows found.')) ?></div>
+<?php else: ?>
+<?php foreach ($changes as $change): ?>
+<div class="modracx-row modracx-stack">
+    <span class="modracx-item-name">
+        <code class="modracx-code"><?= $block->escapeHtml($change['path']) ?></code>
+        <em class="modracx-item-desc">
+            <?= $block->escapeHtml($change['scope']) ?><?php if ($change['scope'] !== 'default'): ?>
+            <?= $block->escapeHtml(' #' . $change['scope_id']) ?><?php endif; ?>
+            <?php if ($change['updated_at'] !== null): ?>
+            · <?= $block->escapeHtml($change['updated_at']) ?>
+            <?php endif; ?>
+        </em>
+        <em class="modracx-value<?= $change['masked'] ? ' modracx-value-masked' : '' ?>">
+            <?= $block->escapeHtml($change['value'] !== '' ? $change['value'] : '(empty)') ?>
+        </em>
+    </span>
+</div>
+<?php endforeach; ?>
+<?php endif; ?>
