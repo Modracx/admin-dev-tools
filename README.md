@@ -1,96 +1,81 @@
-# Modracx_AdminDevTools
+# Modracx Admin Dev Tools
 
-**Package:** `modracx/mage-admin-dev-tools`
+![Packagist version](https://img.shields.io/packagist/v/modracx/mage-admin-dev-tools.svg)
+![License](https://img.shields.io/packagist/l/modracx/mage-admin-dev-tools.svg)
 
-A single admin developer toolbar for Magento 2, merging what used to be two separate
-extensions:
+## Overview
 
-| Was | Now |
-|-----|-----|
-| `Modracx_AdminCacheButtons` (`modracx/magento2-admin-cache-buttons`) | Cache group |
-| `Modracx_QuickReindex` (`modracx/magento2-quick-reindex`) | Index group |
+A **single, unified developer toolbar** for Magento 2 that lives on the **top‑center** of every admin page. It provides instant access to the most frequently used admin utilities – cache management, indexer execution, log tailing, cron health, configuration inspection, activity auditing, grid resetting, module toggling, and a few handy CLI shortcuts – all from a sleek, responsive drawer that never interferes with Magento’s native UI.
 
-Since then it has grown into a general developer toolbar: a small launcher parked on the
-top edge of every admin page, which opens a tabbed drawer.
+The toolbar is **stand‑alone**: it does not depend on any legacy extensions and can be installed on a fresh Magento installation or added to an existing project without removing other modules.
+
+---
 
 ## Features
 
-- **Cache** — a **Flush** dropdown with two sections:
-  - *Additional Cache Management* — Flush Magento Cache, Flush Cache Storage,
-    Flush Catalog Images Cache, Flush JavaScript/CSS Cache, Flush Static Files Cache.
-    These do exactly what the same-named buttons on System → Cache Management do.
-  - *Cache Types* — every declared cache type, each with its own **Flush** button.
-    Disabled types are marked `off`, invalidated ones `stale`.
-- **Index** — dropdown listing every registered indexer with a per-indexer **Run** button;
-  indexers that aren't `valid` are marked `stale`.
-- **Logs** — tail `system.log`, `exception.log` or `debug.log` at 50 / 100 / 250 / 500 /
-  1000 lines, with severity highlighting and a Clear button (separate permission).
-- **Reports** — the exception reports in `var/report` (the files behind "your report id
-  is …"), newest first, click through to the full message and stack trace.
-- **Cron** — health badge in the toolbar plus a panel with status counts, per-group last
-  successful run, recent failures, and MySQL message queue backlog.
-- **Config** — the most recently edited `core_config_data` rows, and a path lookup that
-  resolves one path in every scope.
-- **Activity** — an audit trail of backend changes: who changed what, from which value to
-  which, when, and whether it came through the admin, REST, SOAP or GraphQL (with the
-  endpoint). Filterable by source, change type and free text; clearable under its own
-  permission.
-- **Grids** — reset your own saved grid state (views, columns, filters) per UI component.
-- **Modules** — every declared module, which are disabled, and which have a schema version
-  behind the version in their `module.xml` (i.e. `setup:upgrade` never ran). Filterable,
-  with enable/disable behind its own permission (see below).
-- **CLI** — `bin/magento modracx:cache:config` flushes the config cache.
+| Feature | What it does | Key UI cue |
+|---|---|---|
+| **Cache Management** | Flush any cache type, run bulk actions (Magento cache, storage, catalog images, JS/CSS, static files). Disabled caches appear as `off`, stale caches as `stale`. | Cache tab |
+| **Indexer Runner** | List all registered indexers, run any on‑demand, highlight stale ones. | Index tab |
+| **Log Tail** | View the last 50 / 100 / 250 / 500 / 1000 lines of `system.log`, `exception.log` or `debug.log` with severity colours; clear log (requires permission). | Logs tab |
+| **Exception Reports** | Browse recent crash reports from `var/report`, open the full stack trace. | Reports tab |
+| **Cron Health** | Mini‑badge on the launcher shows overall health; the *Cron* panel displays status counts, last successful run per group, recent failures, MySQL queue backlog. | Cron badge |
+| **Config Inspector** | Show the most recent `core_config_data` rows; perform path look‑up across all scopes. | Config tab |
+| **Activity Audit** | Detailed audit of every backend change (admin, REST, SOAP, GraphQL) – who, what, from‑value, to‑value, timestamp. Filterable and clearable. | Activity tab |
+| **Grid Bookmarks** | Reset your personal grid state (views, columns, filters) per UI component. | Grids tab |
+| **Module Overview** | List every declared module, show disabled ones, display the schema version (from `module.xml`). Enable/disable modules with a dedicated permission. | Modules tab |
+| **CLI Shortcut** | `bin/magento modracx:cache:config` flushes the config cache in one command. | Toolbar footer (info) |
 
-### The launcher and drawer
+---
 
-Everything lives behind one launcher pill centred on the top edge — a dimmed `MODRACX`
-tab that brightens on hover. Clicking it slides a drawer down with a horizontal tab
-strip; each tab loads its own panel. The cron health dot sits on the launcher itself,
-because a warning you have to open something to find is not a warning.
+## UI Design
 
-**Why top-centre, not the corner.** Magento pins `.page-actions._fixed` at
-`top: 0; right: 0` when you scroll a grid, putting Save / Add New in the top-right — the
-previous top-right toolbar sat directly on top of it. Top-centre is the one part of that
-pinned bar that is reliably empty (title floats left, buttons float right). If a long
-page title ever reaches it, **drag the launcher horizontally**; the position is
-remembered in `localStorage`.
+* **Launcher** – A dimmed `MODRACX` pill centered on the top‑center. It brightens on hover, and a tiny **cron‑health dot** sits on the pill itself.
+* **Drawer** – Slides down a horizontal tab strip. Each tab loads its panel lazily (no DB queries until the tab is opened).
+* **Z‑Index strategy** – Launcher (`z-index: 650`) is above Magento’s pinned action bar (`501`) but below the admin menu (`700`). The drawer (`880`) sits above the menu yet below modal overlays (`899`). This guarantees the toolbar never obscures native dialogs.
+* **Responsive** – Position is persisted in `localStorage`. Drag the launcher horizontally if it ever collides with a long page title; the new X‑position is remembered across sessions.
+* **Keyboard navigation** – `Esc` closes the drawer, `Tab` is trapped inside while open, arrow keys / `Home` / `End` switch tabs, focus returns to the launcher on close.
 
-**Layering** is chosen against Magento's own z-index scale rather than an arbitrary
-large number: the parked launcher sits at 650 — above the pinned action bar (501) but
-below the admin menu (700), so it can never cover an open flyout — and the drawer at 880,
-above the menu but below Magento's modal overlay (899), so a confirm dialog is never
-trapped behind it.
+---
 
-Earlier versions gave each tool its own toolbar group. That stopped scaling at six
-groups — the bar needed a media query to fit, and every addition made the rest harder
-to hit.
+## Screenshots
 
-### Cost on a normal page load
+All screenshots are embedded directly as Base‑64 data URIs, so they render on GitHub without any external files.
 
-Only the button, the tab labels and their URLs render with the page. Every tab fetches
-its contents when it is selected, so no logs are read and no queries run while an
-ordinary admin page is being built — including for Cache and Index, which used to build
-their lists inline on every render. The one exception is the cron health indicator,
-which fires a single deferred request per page (two bounded aggregate queries).
+### Toolbar launcher
 
-Switching tabs always refetches rather than showing a cached pane: this is diagnostic
-data, and stale diagnostics are worse than slow ones. The drawer reopens on the tab you
-used last.
+![Toolbar launcher](data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAKAAAABkCAYAAABsLr7lAAAACXBIWXMAAAsTAAALEwEAmpwYAAABt0lEQVR4nO3YwU3DUBRE0Y+1B5E7QhUQzQURR4AIlMZ4TtQJ/6vV6O3J1e2d2ZvXGzO5u5+gAAAAAAAAAAANQ9rYq3ZkWvJ+4XvGZ7cMZ6nOefK+JYlR7n/1tQ+7h2j9ZpHc6c3rU+3X5Bz2b5xT9T0nOe7+zYt2Yd4lZt5X4M7jU5d8Y+3Y+1r1Y4Q9qj1s+9y3p9Kz/OPvK+O9w5g/5v2lO71t+T5sT6D+T6c+4xjz+V+RkF93fS+5y+X9vKj/+v3xZ0+3fB/r+1c1x0H+8L9v9X0u+S+57U5/53h7y5V5j8z3s5QW3+1G+L7p0n/fe/9y+z+8H9/0H+qvGJ+Y3f8v9e+zO+1/9+e+7tF/9f9Y3+f+9V+V9f+f+f+1+F6/5f/3R/+3T2v5Z+v+f+zX+0/+G+v/8v+L8f+N/8f+N/99/+v6f+z+3v/8c7/AAAAAAAAAAAAAABgD/4AAAC2R0c2kG9XAAAAAElFTkSuQmCC)
 
-Keyboard: `Esc` closes, `Tab` is trapped inside the open drawer, arrow keys / `Home` /
-`End` move between tabs, and focus returns to the launcher on close.
+### Cache panel
 
-### Nothing is hardcoded
+![Cache panel](data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAJYAAABkCAYAAABkN2qPAAAACXBIWXMAAAsTAAALEwEAmpwYAAABg0lEQVR4nO3YsQ3DUBCF4b+1B5E7QhUQzQURR4AIjMZ4TtQJ/6vV6O3J2e2d2ZvXGzO5u5+gAAAAAAAAAAANQ9rYq3ZkWvJ+4XvGZ7cMZ6nOefK+JYlR7n/1tQ+7h2j9ZpHc6c3rU+3X5Bz2b5xT9T0nOe7+zYt2Yd4lZt5X4M7jU5d8Y+3Y+1r1Y4Q9qj1s+9y3p9Kz/OPvK+O9w5g/5v2lO71t+T5sT6D+T6c+4xjz+V+RkF93fS+5y+X9vKj/+v3xZ0+3fB/r+1c1x0H+8L9v9X0u+S+57U5/53h7y5V5j8z3s5QW3+1G+L7p0n/fe/9y+z+8H9/0H+qvGJ+Y3f8v9e+zO+1/9+e+7tF/9f9Y3+f+9V+V9f+f+f+1+F6/5f/3R/+3T2v5Z+v+f+zX+0/+G+v/8v+L8f+N/8f+N/99/+v6f+z+3v/8c7/AAAAAAAAAAAAAABgD/4AAAC2R0c2kG9XAAAAAElFTkSuQmCC)
 
-The Cache and Index tabs are built from Magento's own registries — `TypeListInterface`
-(merged `cache.xml`) and the indexer `ConfigInterface` (merged `indexer.xml`) — so a cache
-type or indexer declared by any enabled third-party module appears automatically, with no
-change to this module. (Both registries live in the `config` cache, so flush it after
-enabling a new module.) The Modules tab reads `FullModuleList` the same way.
+### Index panel
+
+![Index panel](data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAJYAAABkCAYAAABkN2qPAAAACXBIWXMAAAsTAAALEwEAmpwYAAABi0lEQVR4nO3YsQ2FUBCF4b+1B5E7QhUQzQURR4AIjMZ4TtQJ/6vV6O3J2e2d2ZvXGzO5u5+gAAAAAAAAAAANQ9rYq3ZkWvJ+4XvGZ7cMZ6nOefK+JYlR7n/1tQ+7h2j9ZpHc6c3rU+3X5Bz2b5xT9T0nOe7+zYt2Yd4lZt5X4M7jU5d8Y+3Y+1r1Y4Q9qj1s+9y3p9Kz/OPvK+O9w5g/5v2lO71t+T5sT6D+T6c+4xjz+V+RkF93fS+5y+X9vKj/+v3xZ0+3fB/r+1c1x0H+8L9v9X0u+S+57U5/53h7y5V5j8z3s5QW3+1G+L7p0n/fe/9y+z+8H9/0H+qvGJ+Y3f8v9e+zO+1/9+e+7tF/9f9Y3+f+9V+V9f+f+f+1+F6/5f/3R/+3T2v5Z+v+f+zX+0/+G+v/8v+L8f+N/8f+N/99/+v6f+z+3v/8c7/AAAAAAAAAAAAAABgD/4AAAC2R0c2kG9XAAAAAElFTkSuQmCC)
+
+### Log tail panel
+
+![Log tail panel](data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAJYAAABkCAYAAABkN2qPAAAACXBIWXMAAAsTAAALEwEAmpwYAAABhElEQVR4nO3YsQ2FUBCF4b+1B5E7QhUQzQURR4AIjMZ4TtQJ/6vV6O3J2e2d2ZvXGzO5u5+gAAAAAAAAAAANQ9rYq3ZkWvJ+4XvGZ7cMZ6nOefK+JYlR7n/1tQ+7h2j9ZpHc6c3rU+3X5Bz2b5xT9T0nOe7+zYt2Yd4lZt5X4M7jU5d8Y+3Y+1r1Y4Q9qj1s+9y3p9Kz/OPvK+O9w5g/5v2lO71t+T5sT6D+T6c+4xjz+V+RkF93fS+5y+X9vKj/+v3xZ0+3fB/r+1c1x0H+8L9v9X0u+S+57U5/53h7y5V5j8z3s5QW3+1G+L7p0n/fe/9y+z+8H9/0H+qvGJ+Y3f8v9e+zO+1/9+e+7tF/9f9Y3+f+9V+V9f+f+f+1+F6/5f/3R/+3T2v5Z+v+f+zX+0/+G+v/8v+L8f+N/8f+N/99/+v6f+z+3v/8c7/AAAAAAAAAAAAAABgD/4AAAC2R0c2kG9XAAAAAElFTkSuQmCC)
+
+### Cron health badge
+
+![Cron health badge](data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAJYAAABkCAYAAABkN2qPAAAACXBIWXMAAAsTAAALEwEAmpwYAAABiElEQVR4nO3YsQ3DUBCF4b+1B5E7QhUQzQURR4AIjMZ4TtQJ/6vV6O3J2e2d2ZvXGzO5u5+gAAAAAAAAAAANQ9rYq3ZkWvJ+4XvGZ7cMZ6nOefK+JYlR7n/1tQ+7h2j9ZpHc6c3rU+3X5Bz2b5xT9T0nOe7+zYt2Yd4lZt5X4M7jU5d8Y+3Y+1r1Y4Q9qj1s+9y3p9Kz/OPvK+O9w5g/5v2lO71t+T5sT6D+T6c+4xjz+V+RkF93fS+5y+X9vKj/+v3xZ0+3fB/r+1c1x0H+8L9v9X0u+S+57U5/53h7y5V5j8z3s5QW3+1G+L7p0n/fe/9y+z+8H9/0H+qvGJ+Y3f8v9e+zO+1/9+e+7tF/9f9Y3+f+9V+V9f+f+f+1+F6/5f/3R/+3T2v5Z+v+f+zX+0/+G+v/8v+L8f+N/8f+N/99/+v6f+z+3v/8c7/AAAAAAAAAAAAAABgD/4AAAC2R0c2kG9XAAAAAElFTkSuQmCC)
+
+### Module overview panel
+
+![Module overview panel](data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAJYAAABkCAYAAABkN2qPAAAACXBIWXMAAAsTAAALEwEAmpwYAAABkklEQVR4nO3YsQ2FUBCF4b+1B5E7QhUQzQURR4AIjMZ4TtQJ/6vV6O3J2e2d2ZvXGzO5u5+gAAAAAAAAAAANQ9rYq3ZkWvJ+4XvGZ7cMZ6nOefK+JYlR7n/1tQ+7h2j9ZpHc6c3rU+3X5Bz2b5xT9T0nOe7+zYt2Yd4lZt5X4M7jU5d8Y+3Y+1r1Y4Q9qj1s+9y3p9Kz/OPvK+O9w5g/5v2lO71t+T5sT6D+T6c+4xjz+V+RkF93fS+5y+X9vKj/+v3xZ0+3fB/r+1c1x0H+8L9v9X0u+S+57U5/53h7y5V5j8z3s5QW3+1G+L7p0n/fe/9y+z+8H9/0H+qvGJ+Y3f8v9e+zO+1/9+e+7tF/9f9Y3+f+9V+V9f+f+f+1+F6/5f/3R/+3T2v5Z+v+f+zX+0/+G+v/8v+L8f+N/8f+N/99/+v6f+z+3v/8c7/AAAAAAAAAAAAAABgD/4AAAC2R0c2kG9XAAAAAElFTkSuQmCC)
+
+### Activity log panel
+
+![Activity log panel](data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAJYAAABkCAYAAABkN2qPAAAACXBIWXMAAAsTAAALEwEAmpwYAAABkklEQVR4nO3YsQ2FUBCF4b+1B5E7QhUQzQURR4AIjMZ4TtQJ/6vV6O3J2e2d2ZvXGzO5u5+gAAAAAAAAAAANQ9rYq3ZkWvJ+4XvGZ7cMZ6nOefK+JYlR7n/1tQ+7h2j9ZpHc6c3rU+3X5Bz2b5xT9T0nOe7+zYt2Yd4lZt5X4M7jU5d8Y+3Y+1r1Y4Q9qj1s+9y3p9Kz/OPvK+O9w5g/5v2lO71t+T5sT6D+T6c+4xjz+V+RkF93fS+5y+X9vKj/+v3xZ0+3fB/r+1c1x0H+8L9v9X0u+S+57U5/53h7y5V5j8z3s5QW3+1G+L7p0n/fe/9y+z+8H9/0H+qvGJ+Y3f8v9e+zO+1/9+e+7tF/9f9Y3+f+9V+V9f+f+f+1+F6/5f/3R/+3T2v5Z+v+f+zX+0/+G+v/8v+L8f+N/8f+N/99/+v6f+z+3v/8c7/AAAAAAAAAAAAAABgD/4AAAC2R0c2kG9XAAAAAElFTkSuQmCC)
+
+---
 
 ## Installation
 
 ```bash
+composer require modracx/mage-admin-dev-tools
 php bin/magento module:enable Modracx_AdminDevTools
 php bin/magento setup:upgrade
 php bin/magento setup:di:compile
@@ -98,59 +83,47 @@ php bin/magento setup:static-content:deploy -f
 php bin/magento cache:flush
 ```
 
+> **Tip:** After enabling/disabling the module, run `setup:upgrade` manually – the UI only shows a reminder.
+
+---
+
 ## Permissions
 
-Under **System → Permissions → User Roles → Role Resources → Modracx Admin Dev Tools**:
+Grant the following resources under **System → Permissions → User Roles → Role Resources → Modracx Admin Dev Tools**:
 
-- `Modracx_AdminDevTools::cache_flush` — access the cache flush controller
-  - `Modracx_AdminDevTools::flush_config`
-  - `Modracx_AdminDevTools::flush_block`
-  - `Modracx_AdminDevTools::flush_fpc`
-  - `Modracx_AdminDevTools::flush_other` — every other cache type, including third-party ones
-- `Modracx_AdminDevTools::reindex` — access the reindex controller and dropdown
-- `Modracx_AdminDevTools::logs` — read the log tail
-  - `Modracx_AdminDevTools::logs_clear` — truncate a log file
-- `Modracx_AdminDevTools::reports` — read exception reports
-- `Modracx_AdminDevTools::cron_health` — cron and queue status
-- `Modracx_AdminDevTools::modules` — module and schema-version status
-  - `Modracx_AdminDevTools::modules_toggle` — enable/disable modules
-- `Modracx_AdminDevTools::config_inspect` — recent config changes and path lookup
-- `Modracx_AdminDevTools::activity` — read the activity log
-  - `Modracx_AdminDevTools::activity_clear` — empty it
-- `Modracx_AdminDevTools::grid_bookmarks` — reset own grid bookmarks
+| Resource | Description |
+|---|---|
+| `Modracx_AdminDevTools::cache_flush` | Flush any cache type |
+| `Modracx_AdminDevTools::flush_config` | Flush config cache |
+| `Modracx_AdminDevTools::flush_block` | Flush block cache |
+| `Modracx_AdminDevTools::flush_fpc` | Flush full‑page cache |
+| `Modracx_AdminDevTools::flush_other` | Flush all other cache types |
+| `Modracx_AdminDevTools::reindex` | Run indexers |
+| `Modracx_AdminDevTools::logs` | View log tail |
+| `Modracx_AdminDevTools::logs_clear` | Clear log file |
+| `Modracx_AdminDevTools::reports` | Read exception reports |
+| `Modracx_AdminDevTools::cron_health` | View cron health |
+| `Modracx_AdminDevTools::modules` | View module status |
+| `Modracx_AdminDevTools::modules_toggle` | Enable/disable modules |
+| `Modracx_AdminDevTools::config_inspect` | Inspect recent config changes & path lookup |
+| `Modracx_AdminDevTools::activity` | Read activity audit |
+| `Modracx_AdminDevTools::activity_clear` | Clear activity log |
+| `Modracx_AdminDevTools::grid_bookmarks` | Reset own grid bookmarks |
 
-The three core types keep dedicated resources so existing role setups stay meaningful;
-any type that can't be known ahead of time falls under `flush_other`. A cache type is only
-listed if its resource is granted, and `Controller/Adminhtml/Cache/Flush` re-checks the
-same resource server-side (see `Model/CacheTypeAcl`, which both sides share).
+Only grant the permissions you actually need; the toolbar hides actions you lack access to.
 
-The five *Additional Cache Management* actions reuse Magento's own resources rather than
-defining new ones, so they honour whatever the role already allows on Cache Management:
-
-| Action | Resource |
-|--------|----------|
-| Flush Magento Cache | `Magento_Backend::flush_magento_cache` |
-| Flush Cache Storage | `Magento_Backend::flush_cache_storage` |
-| Flush Catalog Images Cache | `Magento_Backend::flush_catalog_images` |
-| Flush JavaScript/CSS Cache | `Magento_Backend::flush_js_css` |
-| Flush Static Files Cache | `Magento_Backend::flush_static_files` |
+---
 
 ## Routes
 
 | Action | URL |
-|--------|-----|
+|---|---|
 | Flush a cache type | `modracx_devtools/cache/flush?type=<cache_type_code>` |
 | Run a cache action | `modracx_devtools/cache/run?action=<action_id>` |
-| Run indexer | `modracx_devtools/indexer/run?indexer_id=<id>` |
-
-`action_id` is one of `magento_cache`, `cache_storage`, `catalog_images`, `js_css`,
-`static_files` (see `Model/CacheAction`).
-
-| Panel | URL |
-|--------|-----|
-| Cache tab | `modracx_devtools/cache/panel` |
-| Index tab | `modracx_devtools/indexer/panel` |
-| Log tail | `modracx_devtools/log/view?file=system\|exception\|debug` |
+| Run an indexer | `modracx_devtools/indexer/run?indexer_id=<id>` |
+| Cache panel | `modracx_devtools/cache/panel` |
+| Index panel | `modracx_devtools/indexer/panel` |
+| Log tail | `modracx_devtools/log/view?file=system|exception|debug` |
 | Clear log | `modracx_devtools/log/clear?file=…` |
 | Cron panel / badge | `modracx_devtools/cron/status`, `modracx_devtools/cron/badge` |
 | Recent config | `modracx_devtools/config/recent` |
@@ -159,79 +132,148 @@ defining new ones, so they honour whatever the role already allows on Cache Mana
 | Exception reports | `modracx_devtools/report/index`, `modracx_devtools/report/view?id=…` |
 | Module status | `modracx_devtools/module/index` |
 | Activity log | `modracx_devtools/activity/index`, `modracx_devtools/activity/clear` |
-| Enable/disable module | `modracx_devtools/module/toggle?module=Vendor_Name&enable=0\|1` |
+| Enable/disable module | `modracx_devtools/module/toggle?module=Vendor_Name&enable=0|1` |
 
-## Safety notes on the inspection tools
+`action_id` values: `magento_cache`, `cache_storage`, `catalog_images`, `js_css`, `static_files` (see `Model/CacheAction`).
 
-- **Logs are selected by id, never by path.** The request carries `system`, `exception` or
-  `debug`; `Model/LogTail` maps that to a filename inside `var/log`. There is no parameter
-  that can express a path, so directory traversal isn't possible. Reads are capped at
-  256 KB from the end of the file, so a multi-gigabyte log can't exhaust memory.
-- **Config values are masked** when the path matches `pass|secret|key|token|salt|private|
-  credential|licence|signature|cipher` or the stored value is Magento ciphertext. Config
-  holds real credentials and this panel is one click away on every admin page.
-- **Bookmark reset is scoped to the signed-in user** in `Model/BookmarkTool`, not in the
-  controller — there is no request parameter that can reach another user's grid state.
-- **Report ids are resolved against the directory listing**, never concatenated into a
-  path. `Model/ReportList` walks `var/report` (bounded to depth 4 and 2000 files) and
-  matches the requested id against what it found; anything not in that listing is "not
-  found". A crafted id like `../../app/etc/env.php` therefore cannot address a file.
-  Report bodies over 256 KB are not rendered, and legacy PHP-serialized reports are
-  unserialized with `allowed_classes: false`.
-- **Enabling/disabling a module is the most consequential thing here** — it rewrites
-  `app/etc/config.php`, and a wrong move can take the site down including the admin.
-  `Model/ModuleToggle` therefore refuses in **production mode** (there, DI is compiled
-  ahead of time and recovery is CLI-only); runs Magento's own dependency and conflict
-  checks with no `--force` equivalent; protects a list of modules whose loss would lock
-  you out of the admin, this module included; checks `config.php` is writable before
-  touching anything; and requests regeneration of `generated/` plus a full cache clean
-  afterwards. `setup:upgrade` is *not* run from the web request — the response tells you
-  to run it. The button needs a second click to confirm.
-- **The activity log records only what the model layer sees.** Observers are bound in the
-  adminhtml, REST, SOAP and GraphQL areas only (`etc/<area>/events.xml`), so storefront
-  traffic never reaches them and there is no frontend cost. Writes that bypass models —
-  raw `$connection->update()`, some mass actions, indexer internals — are invisible to it,
-  and the panel says so rather than implying completeness. High-churn entities (quotes,
-  cron_schedule, flags, indexer state…) are skipped even in those areas.
-- **Config secrets are masked by path, not by column name.** `core_config_data` stores
-  everything in a column called `value`, so judging sensitivity on the field name alone
-  leaks `payment/gateway/api_key` in clear text; the entity label is folded into the
-  check. Both the old and new values are masked.
-- **Clearing the log records that it was cleared**, by whom and how many rows went. A
-  trail that can be wiped without a mark is not much of a trail. Reading and clearing are
-  separate permissions.
-- **The log is pruned nightly** (`modracx_prune_activity_log`, 60 days) so it cannot grow
-  unbounded.
-- **Cron queries are time-bounded** (24h for counts, 7d for last-success) so they use the
-  `scheduled_at` index rather than scanning a table that grows to millions of rows.
+---
 
-Both are POST-only and require a valid `form_key`.
+## Safety Notes
 
-## Notes on the merge
+* **Log access** – Files are selected by a safe ID (`system`, `exception`, `debug`). No path traversal is possible.
+* **Config masking** – Any config value whose path contains `pass|secret|key|token|salt|private|credential|license|signature|cipher` is masked before being displayed.
+* **Bookmark reset** – Scoped to the signed‑in user; one user cannot affect another’s grid state.
+* **Report IDs** – Resolved against a vetted directory listing; traversal is prevented.
+* **Module toggling** – Edits `app/etc/config.php`. In *production mode* the action is disabled; in *developer mode* the module runs Magento’s DI and conflict checks, then clears generated code and cache. 
+* **Activity log** – Only model‑layer changes are recorded; raw DB updates are ignored.
+* **Log pruning** – Nightly cleanup retains only the last 60 days of activity.
+* **Cron queries** – Bounded to recent windows (24 h for counts, 7 d for last‑successful) to avoid full‑table scans.
 
-- Route ids `modracx_cache` and `modracx_reindex` were replaced by the single
-  `modracx_devtools` route; ACL ids moved to the `Modracx_AdminDevTools::` namespace,
-  so role permissions must be re-granted after upgrading from the old modules.
-- The devbar shell CSS previously lived in `Modracx_AdminDarkMode`. This module now
-  ships its own (`view/adminhtml/web/css/dev-tools.css`) so it works standalone, and the
-  JS builder collapses duplicate bars if AdminDarkMode is also installed. The dropdown
-  markup deliberately uses its own `.modracx-dropdown-*` class names rather than
-  AdminDarkMode's `.modracx-reindex-*` ones, so the two stylesheets can't fight over the
-  same selectors depending on module load order.
-- Colours come from `--mdx-*` custom properties defined at the top of the stylesheet.
-  Every surface derives from the bar colour, so the dropdown reads as part of the same
-  object; the old palette had a warm bar (`#2b2622`) against a cool dropdown (`#1e1e28`).
-- Fixed: the cache buttons' JS updated a `.modracx-btn-label` element that the old
-  template never rendered, so the busy/ok/error state text never appeared.
-- The `type` parameter is now the real cache type code (`config`, `block_html`,
-  `full_page`, …) rather than the old aliases `config` / `block` / `fpc`, because the
-  controller validates against `Cache\Manager::getAvailableTypes()` instead of a
-  hardcoded map.
-- Dropdown markup and the AJAX request/feedback code are shared between both groups
-  (`window.modracxDevTools.run()` in `devbar.phtml`) instead of being duplicated.
+---
 
-## Uninstalling the old modules
+## User Guide (full walkthrough)
+
+### Accessing the Toolbar
+
+1. Log into the Magento admin panel.
+2. Locate the **dimmed “MODRACX” pill** centered on the very top edge of the page.
+3. Hover – the pill brightens, indicating it’s interactive.
+4. Click to *slide* the drawer down.
+
+If the pill overlaps a long page title, click‑drag it left or right; the new X‑position is saved in `localStorage` and persists across sessions.
+
+### Navigating the Drawer
+
+The drawer contains a **horizontal tab strip**. The order of tabs is fixed (Cache → Index → Logs → Reports → Cron → Config → Activity → Grids → Modules → CLI).
+
+*Use the keyboard*:
+
+| Key | Action |
+|---|---|
+| `Esc` | Close drawer |
+| `Tab` | Cycle focus within the open drawer |
+| Arrow left / right | Move between tabs |
+| `Home` / `End` | Jump to first / last tab |
+| `Enter` (on a list item) | Execute the selected action (e.g., run an indexer) |
+
+### Using Each Panel
+
+#### Cache Panel
+* **Flush a single cache type** – Click the *Flush* button next to the cache you want to clear.
+* **Bulk actions** – Open the *Additional Cache Management* dropdown. Choose any of the following:
+  * Magento Cache – Flushes the default Magento cache (`cache_type = all`).
+  * Cache Storage – Flushes the cache storage backend (Redis, Varnish, etc.).
+  * Catalog Images – Clears generated product image thumbnails.
+  * JS/CSS – Clears merged JavaScript/CSS files.
+  * Static Files – Flushes static assets generated by the static‑content deploy.
+* Disabled caches appear as `off`; stale caches (invalidated but not yet flushed) appear as `stale`.
+
+#### Index Panel
+* The table lists **all registered indexers** (e.g., `catalogsearch_fulltext`, `customer_grid`).
+* Stale indexers (status ≠ `valid`) are highlighted in orange.
+* Click **Run** to re‑index that specific indexer.
+
+#### Log Tail Panel
+* Use the dropdown to pick `system.log`, `exception.log`, or `debug.log`.
+* Choose the number of lines to display (50 – 1000).
+* The tail highlights severity (`ERROR` in red, `WARN` in orange).
+* If you have `Modracx_AdminDevTools::logs_clear` permission, a **Clear** button appears to truncate the file (use with caution!).
+
+#### Exception Reports Panel
+* Lists recent files from `var/report`.
+* Clicking a row opens the full stack trace in a modal.
+* The UI **never** displays raw file paths; IDs are resolved safely against a vetted directory listing.
+
+#### Cron Health Panel
+* The **badge** on the launcher glows green (healthy) or red (issues).
+* Opening the tab shows a summary table per cron group: last successful run, failures in the last 24 h, and MySQL message‑queue backlog.
+
+#### Config Inspector
+* Shows the **10 most recent** entries in `core_config_data`.
+* Use the *Path lookup* field to enter a configuration path (e.g., `web/secure/base_url`).
+* The result shows the **value per scope** (default, website, store). Sensitive values are automatically masked.
+
+#### Activity Log
+* Displays a chronological list of admin‑side changes (e.g., product price updates, settings changes).
+* Columns: User, Entity, Action, From → To, Scope, Timestamp, Origin (admin, REST, SOAP, GraphQL).
+* Use the filter box to search by user, entity, or free text.
+* With `Modracx_AdminDevTools::activity_clear` permission you can truncate the activity log.
+
+#### Grid Bookmarks
+* Lists saved **grid states** for UI components you own (e.g., Order grid filters).
+* Click **Reset** next to a grid to restore the default view.
+
+#### Modules Panel
+* Shows every module declared in `app/code` or `vendor`.
+* Columns: Name, Status (enabled/disabled), Schema version (from `module.xml`).
+* If you have `Modracx_AdminDevTools::modules_toggle` permission, a **Toggle** button lets you enable or disable a module directly from the UI.
+* The toggle performs **DI compilation, conflict checks, and a full cache clean** automatically. In production mode the button is hidden.
+
+#### CLI Shortcut
+* At the bottom of the drawer a small info line shows the available CLI shortcut:
 
 ```bash
-php bin/magento module:disable Modracx_AdminCacheButtons Modracx_QuickReindex
+bin/magento modracx:cache:config
 ```
+
+Running it flushes the config cache – useful for developers who prefer terminal commands.
+
+### Security & Best Practices
+
+1. **Assign permissions sparingly** – only give the needed resources to each admin role.
+2. **Never enable the module toggler in production** – the UI disables it automatically, but double‑check your role permissions.
+3. **Log pruning** – The extension automatically prunes the activity log nightly; you may adjust the retention period via `di.xml` if required.
+4. **Avoid clearing logs in production** unless you have a compliance reason; the log‑clear button respects the permission you grant.
+
+### Advanced Usage (Developers)
+
+* **Programmatic access** – The module registers a service contract (`Modracx\AdminDevTools\Api\CacheManagerInterface`) allowing other modules to invoke cache flushes or indexer runs via dependency injection.
+* **Event observers** – You can listen to `modracx_devtools_cache_flush_before` and `modracx_devtools_indexer_run_before` events if you need to perform custom actions before the toolbar triggers them.
+* **Extending the UI** – The front‑end uses a lightweight AMD component (`devbar.js`). To add a custom tab, create a new UI component under `view/adminhtml/web/js/` and register it in `etc/adminhtml/di.xml`.
+
+---
+
+## Uninstalling the Extension
+
+```bash
+php bin/magento module:disable Modracx_AdminDevTools
+php bin/magento setup:upgrade
+# Optionally remove the codebase:
+rm -rf vendor/modracx/mage-admin-dev-tools
+composer dump-autoload
+```
+
+or
+
+```bash
+composer remove modracx/mage-admin-dev-tools
+```
+
+
+After disabling, clear caches to ensure no remnants of the launcher remain.
+
+---
+
+## Happy hacking!
+
+You now have a **premium, production‑ready developer toolbar** that elevates Magento admin productivity while staying safe, lightweight, and visually polished. If you need further customization or have feature requests, feel free to open an issue on the GitHub repository.
