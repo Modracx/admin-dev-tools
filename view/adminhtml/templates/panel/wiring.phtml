@@ -1,0 +1,134 @@
+<?php
+/** @var \Modracx\AdminDevTools\Block\Adminhtml\Panel $block */
+$type      = (string) $block->getData('type');
+$event     = (string) $block->getData('event');
+$result    = $block->getData('result');
+$observers = $block->getData('observers');
+$error     = (string) $block->getData('error');
+?>
+<div class="modracx-panel-head">
+    <span class="modracx-panel-title"><?= $block->escapeHtml(__('Wiring')) ?></span>
+</div>
+
+<div class="modracx-panel-form">
+    <input type="text" class="modracx-input" id="modracx-wiring-type"
+           value="<?= $block->escapeHtmlAttr($type) ?>"
+           placeholder="Magento\Catalog\Api\ProductRepositoryInterface"
+           spellcheck="false" autocomplete="off">
+    <button type="button" class="modracx-run-btn" id="modracx-wiring-go"><?= $block->escapeHtml(__('Inspect')) ?></button>
+</div>
+
+<div class="modracx-panel-form">
+    <input type="text" class="modracx-input" id="modracx-wiring-event"
+           value="<?= $block->escapeHtmlAttr($event) ?>"
+           placeholder="sales_order_place_after"
+           spellcheck="false" autocomplete="off">
+    <button type="button" class="modracx-run-btn" id="modracx-wiring-event-go"><?= $block->escapeHtml(__('Observers')) ?></button>
+</div>
+
+<?php if ($error !== ''): ?>
+<div class="modracx-verdict modracx-verdict-err"><?= $block->escapeHtml($error) ?></div>
+<?php endif; ?>
+
+<?php if ($result === null && $observers === null && $error === ''): ?>
+<div class="modracx-panel-empty">
+    <?= $block->escapeHtml(__('Enter a class or interface to see the preference it resolves to, every plugin that intercepts it and the virtual types built on it — or an event name to see its observers. Read from the merged di.xml and events.xml of every area.')) ?>
+</div>
+<?php endif; ?>
+
+<?php if (is_array($result)): ?>
+<div class="modracx-section">
+    <code class="modracx-code"><?= $block->escapeHtml($result['type']) ?></code>
+    <?php if (!$result['exists']): ?>
+    <em class="modracx-item-flag modracx-flag-warn"
+        title="<?= $block->escapeHtmlAttr(__('Not autoloadable — check the spelling, or it may be a virtual type name')) ?>">
+        <?= $block->escapeHtml(__('not found')) ?>
+    </em>
+    <?php else: ?>
+    <em class="modracx-item-flag"><?= $block->escapeHtml($result['kind']) ?></em>
+    <?php endif; ?>
+</div>
+
+<div class="modracx-section"><?= $block->escapeHtml(__('Preference')) ?></div>
+<?php if (empty($result['preferences'])): ?>
+<div class="modracx-panel-empty">
+    <?= $block->escapeHtml(__('No preference declared — the class is used as written.')) ?>
+</div>
+<?php else: ?>
+<?php foreach ($result['preferences'] as $preference): ?>
+<div class="modracx-row">
+    <span class="modracx-item-name">
+        <code class="modracx-code"><?= $block->escapeHtml($preference['to']) ?></code>
+        <em class="modracx-item-desc"><?= $block->escapeHtml(__('in %1', $preference['area'])) ?></em>
+    </span>
+</div>
+<?php endforeach; ?>
+<?php endif; ?>
+
+<div class="modracx-section">
+    <?= $block->escapeHtml(__('Plugins (%1)', count($result['plugins']))) ?>
+</div>
+<?php if (empty($result['plugins'])): ?>
+<div class="modracx-panel-empty"><?= $block->escapeHtml(__('Nothing intercepts this type.')) ?></div>
+<?php else: ?>
+<?php foreach ($result['plugins'] as $plugin): ?>
+<div class="modracx-row modracx-stack">
+    <span class="modracx-item-name">
+        <?= $block->escapeHtml($plugin['name']) ?>
+        <?php if ($plugin['disabled']): ?>
+        <em class="modracx-item-flag modracx-flag-warn"><?= $block->escapeHtml(__('disabled')) ?></em>
+        <?php endif; ?>
+        <em class="modracx-item-flag"><?= $block->escapeHtml($plugin['area']) ?></em>
+        <em class="modracx-item-flag"><?= $block->escapeHtml(__('sort %1', $plugin['sort_order'])) ?></em>
+        <em class="modracx-item-desc">
+            <code class="modracx-code"><?= $block->escapeHtml($plugin['instance']) ?></code>
+            <?php if ($plugin['declared_on'] !== $result['type']): ?>
+            <br><?= $block->escapeHtml(__('declared on %1', $plugin['declared_on'])) ?>
+            <?php endif; ?>
+            <?php if (!empty($plugin['methods'])): ?>
+            <br><?= $block->escapeHtml(implode(' · ', $plugin['methods'])) ?>
+            <?php endif; ?>
+        </em>
+    </span>
+</div>
+<?php endforeach; ?>
+<?php endif; ?>
+
+<?php if (!empty($result['virtual_types'])): ?>
+<div class="modracx-section">
+    <?= $block->escapeHtml(__('Virtual types built on it (%1)', count($result['virtual_types']))) ?>
+</div>
+<?php foreach ($result['virtual_types'] as $virtual): ?>
+<div class="modracx-row">
+    <span class="modracx-item-name">
+        <code class="modracx-code"><?= $block->escapeHtml($virtual['name']) ?></code>
+        <em class="modracx-item-desc"><?= $block->escapeHtml(__('in %1', $virtual['area'])) ?></em>
+    </span>
+</div>
+<?php endforeach; ?>
+<?php endif; ?>
+<?php endif; ?>
+
+<?php if (is_array($observers)): ?>
+<div class="modracx-section">
+    <?= $block->escapeHtml(__('Observers of %1 (%2)', $observers['event'], count($observers['observers']))) ?>
+</div>
+<?php if (empty($observers['observers'])): ?>
+<div class="modracx-panel-empty">
+    <?= $block->escapeHtml(__('Nothing observes this event — check the spelling, it is not an error to dispatch an unobserved event.')) ?>
+</div>
+<?php else: ?>
+<?php foreach ($observers['observers'] as $observer): ?>
+<div class="modracx-row modracx-stack">
+    <span class="modracx-item-name">
+        <?= $block->escapeHtml($observer['name']) ?>
+        <?php if ($observer['disabled']): ?>
+        <em class="modracx-item-flag modracx-flag-warn"><?= $block->escapeHtml(__('disabled')) ?></em>
+        <?php endif; ?>
+        <em class="modracx-item-flag"><?= $block->escapeHtml($observer['area']) ?></em>
+        <em class="modracx-item-desc"><code class="modracx-code"><?= $block->escapeHtml($observer['instance']) ?></code></em>
+    </span>
+</div>
+<?php endforeach; ?>
+<?php endif; ?>
+<?php endif; ?>

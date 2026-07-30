@@ -387,9 +387,28 @@
         });
 
         /* Cache panel */
+
+        /**
+         * Report what the server said, in the panel.
+         *
+         * The button's tick only says a request came back. The server now verifies the flush
+         * by planting a probe entry and reading it back, and that verdict is the only thing
+         * that distinguishes "emptied" from "the backend said yes and kept everything" —
+         * so it belongs on screen, not in a title attribute nobody hovers over.
+         */
+        function cacheVerdict(panel, d) {
+            var el = panel.querySelector('[data-cache-verdict]');
+            if (!el) { return; }
+
+            el.hidden = false;
+            el.textContent = d.message || (d.success ? 'Done.' : 'Failed.');
+            el.className = 'modracx-verdict modracx-verdict-' + (d.success ? 'ok' : 'err');
+        }
+
         panel.querySelectorAll('.modracx-flush-btn').forEach(function (btn) {
             btn.addEventListener('click', function () {
                 run(btn, urls.cacheFlush, { type: btn.dataset.type }, RUN_OPTS).then(function (d) {
+                    cacheVerdict(panel, d);
                     if (!d.success) { return; }
                     var flag = btn.parentNode.querySelector('.modracx-item-flag.modracx-flag-warn');
                     if (flag) { flag.parentNode.removeChild(flag); }
@@ -398,7 +417,9 @@
         });
         panel.querySelectorAll('.modracx-action-btn').forEach(function (btn) {
             btn.addEventListener('click', function () {
-                run(btn, urls.cacheAction, { action: btn.dataset.action }, RUN_OPTS);
+                run(btn, urls.cacheAction, { action: btn.dataset.action }, RUN_OPTS).then(function (d) {
+                    cacheVerdict(panel, d);
+                });
             });
         });
 
@@ -409,6 +430,106 @@
                     if (!d.success) { return; }
                     var flag = btn.parentNode.querySelector('.modracx-item-flag');
                     if (flag) { flag.parentNode.removeChild(flag); }
+                });
+            });
+        });
+
+        /* Flags panel — toggle, then refetch so the switch shows the value that landed */
+        panel.querySelectorAll('.modracx-flag-btn').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                if (btn.disabled) { return; }
+                run(btn, urls.flagToggle, { flag: btn.dataset.flag, enable: btn.dataset.enable }, RUN_OPTS)
+                    .then(function (d) {
+                        var el = panel.querySelector('[data-flag-verdict]');
+                        if (el) {
+                            el.hidden = false;
+                            el.textContent = d.message || (d.success ? 'Done.' : 'Failed.');
+                            el.className = 'modracx-verdict modracx-verdict-' + (d.success ? 'ok' : 'err');
+                        }
+                        if (d.success) { setTimeout(function () { load(panel); }, 900); }
+                    });
+            });
+        });
+
+        /* Wiring panel — a class box and an event box, each posting back to the same panel */
+        var wiringType  = panel.querySelector('#modracx-wiring-type');
+        var wiringEvent = panel.querySelector('#modracx-wiring-event');
+        if (wiringType && wiringEvent) {
+            var inspect = function (extra) {
+                var params = { type: '', event: '' };
+                Object.keys(extra).forEach(function (k) { params[k] = extra[k]; });
+                load(panel, params);
+            };
+            var goType  = function () { inspect({ type: wiringType.value }); };
+            var goEvent = function () { inspect({ event: wiringEvent.value }); };
+
+            panel.querySelector('#modracx-wiring-go').addEventListener('click', goType);
+            panel.querySelector('#modracx-wiring-event-go').addEventListener('click', goEvent);
+            wiringType.addEventListener('keydown', function (e) {
+                if (e.key === 'Enter') { e.preventDefault(); goType(); }
+            });
+            wiringEvent.addEventListener('keydown', function (e) {
+                if (e.key === 'Enter') { e.preventDefault(); goEvent(); }
+            });
+            wiringType.focus();
+        }
+
+        /* Cron panel — run one job, then refetch so the history shows what just happened */
+        panel.querySelectorAll('.modracx-cron-run-btn').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                run(btn, urls.cronRun, { job_code: btn.dataset.job }, {
+                    busyText: 'running…', okText: 'Done', errText: 'Failed', resetAfter: 4000
+                }).then(function (d) {
+                    if (d.message) { btn.title = d.message; }
+                    setTimeout(function () { load(panel); }, d.success ? 800 : 2500);
+                });
+            });
+        });
+        panel.querySelectorAll('.modracx-run-filter').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                load(panel, { run_status: btn.dataset.runStatus });
+            });
+        });
+
+        /* Index panel — switch an indexer between realtime and schedule */
+        panel.querySelectorAll('.modracx-indexer-mode-btn').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                run(btn, urls.indexerMode, {
+                    indexer_id: btn.dataset.id,
+                    scheduled:  btn.dataset.scheduled
+                }, RUN_OPTS).then(function (d) {
+                    if (d.success) { setTimeout(function () { load(panel); }, 700); }
+                });
+            });
+        });
+
+        /* URL rewrites */
+        var rewriteInput = panel.querySelector('#modracx-rewrite-path');
+        var rewriteGo    = panel.querySelector('#modracx-rewrite-go');
+        if (rewriteInput && rewriteGo) {
+            var lookupPath = function () { load(panel, { path: rewriteInput.value }); };
+            rewriteGo.addEventListener('click', lookupPath);
+            rewriteInput.addEventListener('keydown', function (e) {
+                if (e.key === 'Enter') { e.preventDefault(); lookupPath(); }
+            });
+            rewriteInput.focus();
+        }
+
+        /* Mail — drill into one message and back out */
+        panel.querySelectorAll('.modracx-mail-view').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                load(panel, { id: btn.dataset.id }, urls.mailView);
+            });
+        });
+        panel.querySelectorAll('.modracx-mail-back').forEach(function (btn) {
+            btn.addEventListener('click', function () { load(panel, { id: '' }); });
+        });
+        panel.querySelectorAll('.modracx-mail-clear').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                run(btn, urls.mailClear, {}, {
+                    busyText: '...', okText: 'Cleared', errText: 'Err', resetAfter: 1500
+                }).then(function (d) {
+                    if (d.success) { setTimeout(function () { load(panel); }, 600); }
                 });
             });
         });

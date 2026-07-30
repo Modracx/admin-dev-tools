@@ -1,0 +1,64 @@
+<?php
+/** @var \Modracx\AdminDevTools\Block\Adminhtml\Panel $block */
+$mails      = (array) $block->getData('mails');
+$available  = (bool) $block->getData('available');
+$suppressed = (bool) $block->getData('suppressed');
+$retention  = (int) $block->getData('retention');
+$canClear   = (bool) $block->getData('can_clear');
+?>
+<div class="modracx-panel-head">
+    <span class="modracx-panel-title"><?= $block->escapeHtml(__('Mail')) ?></span>
+    <div class="modracx-panel-actions">
+        <button type="button" class="modracx-run-btn modracx-panel-refresh"><?= $block->escapeHtml(__('Refresh')) ?></button>
+        <?php if ($canClear && $available): ?>
+        <button type="button" class="modracx-run-btn modracx-danger-btn modracx-mail-clear"><?= $block->escapeHtml(__('Clear')) ?></button>
+        <?php endif; ?>
+    </div>
+</div>
+
+<?php if (!$available): ?>
+<div class="modracx-panel-empty">
+    <?= $block->escapeHtml(__('The mail log table does not exist yet — run bin/magento setup:upgrade.')) ?>
+</div>
+<?php else: ?>
+
+<?php if ($suppressed): ?>
+<div class="modracx-verdict modracx-verdict-err">
+    <?= $block->escapeHtml(__('Delivery is suppressed: messages are recorded here and never sent. This is ignored in production mode.')) ?>
+</div>
+<?php endif; ?>
+
+<?php if (empty($mails)): ?>
+<div class="modracx-panel-empty">
+    <?= $block->escapeHtml(__('No mail captured yet. Anything the application sends from now on is recorded here.')) ?>
+</div>
+<?php else: ?>
+<?php foreach ($mails as $mail): ?>
+<div class="modracx-row modracx-stack modracx-mail-row" data-id="<?= $block->escapeHtmlAttr((string) $mail['mail_id']) ?>">
+    <span class="modracx-item-name">
+        <?= $block->escapeHtml($mail['subject'] !== '' ? $mail['subject'] : __('(no subject)')) ?>
+        <?php if (!$mail['delivered']): ?>
+        <em class="modracx-item-flag <?= $mail['error'] !== null ? 'modracx-flag-err' : 'modracx-flag-warn' ?>">
+            <?= $block->escapeHtml($mail['error'] !== null ? __('failed') : __('suppressed')) ?>
+        </em>
+        <?php else: ?>
+        <em class="modracx-item-flag modracx-flag-ok"><?= $block->escapeHtml(__('sent')) ?></em>
+        <?php endif; ?>
+        <em class="modracx-item-desc">
+            <?= $block->escapeHtml($mail['mail_to'] !== '' ? $mail['mail_to'] : __('(no recipient)')) ?>
+            · <?= $block->escapeHtml($block->formatAgo($mail['sent_at'])) ?>
+            <?php if ($mail['error'] !== null): ?>
+            <br><?= $block->escapeHtml(mb_substr($mail['error'], 0, 200)) ?>
+            <?php endif; ?>
+        </em>
+    </span>
+    <button type="button" class="modracx-run-btn modracx-mail-view"
+            data-id="<?= $block->escapeHtmlAttr((string) $mail['mail_id']) ?>"><?= $block->escapeHtml(__('Open')) ?></button>
+</div>
+<?php endforeach; ?>
+<?php endif; ?>
+
+<div class="modracx-panel-note">
+    <?= $block->escapeHtml(__('Captured as the message is handed to the transport — after templating, which is the version worth reading. Failed sends are recorded too. Entries older than %1 days are pruned nightly.', $retention)) ?>
+</div>
+<?php endif; ?>

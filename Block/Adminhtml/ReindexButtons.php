@@ -5,7 +5,7 @@ namespace Modracx\AdminDevTools\Block\Adminhtml;
 
 use Magento\Backend\Block\Template;
 use Magento\Backend\Block\Template\Context;
-use Magento\Indexer\Model\Indexer\CollectionFactory;
+use Modracx\AdminDevTools\Model\IndexerInsight;
 
 class ReindexButtons extends Template
 {
@@ -13,27 +13,27 @@ class ReindexButtons extends Template
 
     public function __construct(
         Context $context,
-        private readonly CollectionFactory $indexerCollectionFactory,
+        private readonly IndexerInsight $indexerInsight,
         array $data = []
     ) {
         parent::__construct($context, $data);
     }
 
+    /**
+     * @return array<int, array<string, mixed>>
+     */
     public function getIndexers(): array
     {
-        $indexers = [];
-        foreach ($this->indexerCollectionFactory->create()->getItems() as $indexer) {
-            $indexers[] = [
-                'id'     => $indexer->getId(),
-                'title'  => $indexer->getTitle(),
-                'status' => $indexer->getStatus(),
-            ];
-        }
-        return $indexers;
+        return $this->indexerInsight->getIndexers();
     }
 
     public function canReindex(): bool
     {
         return $this->_authorization->isAllowed('Modracx_AdminDevTools::reindex');
+    }
+
+    public function canChangeMode(): bool
+    {
+        return $this->_authorization->isAllowed('Modracx_AdminDevTools::reindex_mode');
     }
 }

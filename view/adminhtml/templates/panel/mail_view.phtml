@@ -1,0 +1,56 @@
+<?php
+/** @var \Modracx\AdminDevTools\Block\Adminhtml\Panel $block */
+$mail = (array) $block->getData('mail');
+$body = (string) ($mail['body'] ?? '');
+$isHtml = stripos((string) ($mail['content_type'] ?? ''), 'html') !== false
+    || preg_match('~<(html|body|table|div|p)\b~i', $body) === 1;
+?>
+<div class="modracx-panel-head">
+    <span class="modracx-panel-title"><?= $block->escapeHtml(__('Message')) ?></span>
+    <div class="modracx-panel-actions">
+        <button type="button" class="modracx-run-btn modracx-mail-back"><?= $block->escapeHtml(__('Back')) ?></button>
+    </div>
+</div>
+
+<div class="modracx-section"><?= $block->escapeHtml($mail['subject'] ?? __('(no subject)')) ?></div>
+
+<?php
+// String keys, not Phrase: a Phrase cannot be an array key.
+$fields = [
+    'mail_to'      => __('To'),
+    'mail_from'    => __('From'),
+    'mail_cc'      => __('Cc'),
+    'mail_bcc'     => __('Bcc'),
+    'content_type' => __('Type'),
+    'sent_at'      => __('Sent'),
+];
+?>
+<?php foreach ($fields as $key => $label): ?>
+<?php $value = $mail[$key] ?? null; ?>
+<?php if ($value === null || $value === ''): ?><?php continue; ?><?php endif; ?>
+<div class="modracx-row">
+    <span class="modracx-item-name"><?= $block->escapeHtml($label) ?></span>
+    <em class="modracx-value"><?= $block->escapeHtml((string) $value) ?></em>
+</div>
+<?php endforeach; ?>
+
+<?php if (!empty($mail['error'])): ?>
+<div class="modracx-verdict modracx-verdict-err"><?= $block->escapeHtml((string) $mail['error']) ?></div>
+<?php endif; ?>
+
+<div class="modracx-section"><?= $block->escapeHtml(__('Body')) ?></div>
+<?php if ($isHtml): ?>
+<?php
+// Rendered inside a fully sandboxed iframe: no scripts, no forms, no same-origin access,
+// no network. A captured email is untrusted content that reached this store from outside,
+// and the admin session is the last place to hand it a script tag.
+?>
+<iframe class="modracx-mail-frame" sandbox=""
+        srcdoc="<?= $block->escapeHtmlAttr($body) ?>"
+        title="<?= $block->escapeHtmlAttr(__('Message body')) ?>"></iframe>
+<div class="modracx-panel-note">
+    <?= $block->escapeHtml(__('Rendered in a sandboxed frame: no scripts, no network, no access to this page.')) ?>
+</div>
+<?php else: ?>
+<pre class="modracx-log"><?= $block->escapeHtml($body) ?></pre>
+<?php endif; ?>

@@ -1,6 +1,8 @@
 <?php
 /** @var \Modracx\AdminDevTools\Block\Adminhtml\ReindexButtons $block */
-$indexers = $block->getIndexers();
+$indexers   = $block->getIndexers();
+$canRun     = $block->canReindex();
+$canSetMode = $block->canChangeMode();
 ?>
 <div class="modracx-panel-head">
     <span class="modracx-panel-title"><?= $block->escapeHtml(__('Indexers')) ?></span>
@@ -21,10 +23,37 @@ $indexers = $block->getIndexers();
             <?= $block->escapeHtml($idx['status']) ?>
         </em>
         <?php endif; ?>
-        <em class="modracx-item-desc"><code class="modracx-code"><?= $block->escapeHtml($idx['id']) ?></code></em>
+        <?php if ($idx['backlog'] !== null && $idx['backlog'] > 0): ?>
+        <em class="modracx-item-flag <?= $idx['backlog'] > 1000 ? 'modracx-flag-err' : 'modracx-flag-warn' ?>"
+            title="<?= $block->escapeHtmlAttr(__('Changelog entries this view has not consumed. A reindex does not clear these — only cron does.')) ?>">
+            <?= $block->escapeHtml(__('%1 behind', $idx['backlog'])) ?>
+        </em>
+        <?php endif; ?>
+        <em class="modracx-item-desc">
+            <code class="modracx-code"><?= $block->escapeHtml($idx['id']) ?></code>
+            · <?= $block->escapeHtml($idx['scheduled'] ? __('by schedule') : __('on save')) ?>
+            <?php if ($idx['updated'] !== null): ?>
+            · <?= $block->escapeHtml(__('updated %1', $idx['updated'])) ?>
+            <?php endif; ?>
+        </em>
     </span>
-    <button type="button" class="modracx-run-btn modracx-reindex-btn"
-            data-id="<?= $block->escapeHtmlAttr($idx['id']) ?>"><?= $block->escapeHtml(__('Run')) ?></button>
+    <span class="modracx-item-counts">
+        <?php if ($canSetMode): ?>
+        <button type="button" class="modracx-run-btn modracx-indexer-mode-btn"
+                data-id="<?= $block->escapeHtmlAttr($idx['id']) ?>"
+                data-scheduled="<?= $idx['scheduled'] ? '0' : '1' ?>"
+                title="<?= $block->escapeHtmlAttr(
+                    $idx['scheduled'] ? __('Switch to Update on Save') : __('Switch to Update by Schedule')
+                ) ?>"><?= $block->escapeHtml($idx['scheduled'] ? __('→ on save') : __('→ schedule')) ?></button>
+        <?php endif; ?>
+        <?php if ($canRun): ?>
+        <button type="button" class="modracx-run-btn modracx-reindex-btn"
+                data-id="<?= $block->escapeHtmlAttr($idx['id']) ?>"><?= $block->escapeHtml(__('Run')) ?></button>
+        <?php endif; ?>
+    </span>
 </div>
 <?php endforeach; ?>
+<div class="modracx-panel-note">
+    <?= $block->escapeHtml(__('"Behind" counts changelog rows the mview has not consumed. Run clears the index, not the backlog — only cron does that, which is why a finished reindex can still leave a stale storefront.')) ?>
+</div>
 <?php endif; ?>

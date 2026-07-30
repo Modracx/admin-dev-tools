@@ -8,6 +8,7 @@ use Magento\Backend\App\Action\Context;
 use Magento\Framework\App\Action\HttpPostActionInterface;
 use Magento\Framework\Controller\Result\JsonFactory;
 use Modracx\AdminDevTools\Model\CacheAction;
+use Modracx\AdminDevTools\Model\FlushVerifier;
 
 /**
  * Runs one of the "Additional Cache Management" actions over AJAX.
@@ -19,7 +20,8 @@ class Run extends Action implements HttpPostActionInterface
     public function __construct(
         Context $context,
         private readonly CacheAction $cacheAction,
-        private readonly JsonFactory $jsonFactory
+        private readonly JsonFactory $jsonFactory,
+        private readonly FlushVerifier $verifier
     ) {
         parent::__construct($context);
     }
@@ -39,7 +41,19 @@ class Run extends Action implements HttpPostActionInterface
         }
 
         try {
-            return $result->setData(['success' => true, 'message' => $this->cacheAction->execute($action)]);
+            // Only the two storage-wide actions are supposed to leave every frontend empty.
+            // The file-cleaning ones (images, js/css, static) touch no cache frontend at all,
+            // so probing them would report a false failure.
+            $wipesEverything = in_array($action, [CacheAction::SYSTEM, CacheAction::STORAGE], true);
+            $probes = $wipesEverything ? $this->verifier->probeAllFrontends() : [];
+
+            $message = $this->cacheAction->execute($action);
+            $survivors = $wipesEverything ? $this->verifier->survivors($probes) : [];
+
+            return $result->setData([
+                'success' => $survivors === [],
+                'message' => $message . $this->verifier->note(null, $survivors),
+            ]);
         } catch (\Exception $e) {
             return $result->setData(['success' => false, 'message' => $e->getMessage()]);
         }

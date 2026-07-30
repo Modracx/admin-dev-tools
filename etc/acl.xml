@@ -11,12 +11,26 @@
                         <resource id="Modracx_AdminDevTools::flush_fpc" title="Flush Full Page Cache" sortOrder="30"/>
                         <resource id="Modracx_AdminDevTools::flush_other" title="Flush Other Cache Types" sortOrder="40"/>
                     </resource>
-                    <resource id="Modracx_AdminDevTools::reindex" title="Quick Reindex" sortOrder="20"/>
+                    <resource id="Modracx_AdminDevTools::reindex" title="Quick Reindex" sortOrder="20">
+                        <resource id="Modracx_AdminDevTools::reindex_mode" title="Change Indexer Mode" sortOrder="10"/>
+                    </resource>
+                    <resource id="Modracx_AdminDevTools::environment" title="Environment Summary" sortOrder="22"/>
+                    <resource id="Modracx_AdminDevTools::database" title="Database Size" sortOrder="23"/>
+                    <resource id="Modracx_AdminDevTools::rewrites" title="URL Rewrite Lookup" sortOrder="24"/>
+                    <resource id="Modracx_AdminDevTools::mail" title="Captured Mail" sortOrder="26">
+                        <resource id="Modracx_AdminDevTools::mail_clear" title="Clear Captured Mail" sortOrder="10"/>
+                    </resource>
+                    <resource id="Modracx_AdminDevTools::flags" title="Developer Flags" sortOrder="25">
+                        <resource id="Modracx_AdminDevTools::flags_write" title="Change Developer Flags" sortOrder="10"/>
+                    </resource>
+                    <resource id="Modracx_AdminDevTools::wiring" title="Inspect Wiring (DI and Events)" sortOrder="28"/>
                     <resource id="Modracx_AdminDevTools::logs" title="View Log Tail" sortOrder="30">
                         <resource id="Modracx_AdminDevTools::logs_clear" title="Clear Log Files" sortOrder="10"/>
                     </resource>
                     <resource id="Modracx_AdminDevTools::reports" title="View Exception Reports" sortOrder="35"/>
-                    <resource id="Modracx_AdminDevTools::cron_health" title="Cron and Queue Health" sortOrder="40"/>
+                    <resource id="Modracx_AdminDevTools::cron_health" title="Cron and Queue Health" sortOrder="40">
+                        <resource id="Modracx_AdminDevTools::cron_run" title="Run Cron Jobs" sortOrder="10"/>
+                    </resource>
                     <resource id="Modracx_AdminDevTools::modules" title="Module Status" sortOrder="45">
                         <resource id="Modracx_AdminDevTools::modules_toggle" title="Enable/Disable Modules" sortOrder="10"/>
                     </resource>

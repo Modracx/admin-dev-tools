@@ -1,0 +1,31 @@
+<?php
+/** @var \Modracx\AdminDevTools\Block\Adminhtml\Panel $block */
+$sections = (array) $block->getData('sections');
+?>
+<div class="modracx-panel-head">
+    <span class="modracx-panel-title"><?= $block->escapeHtml(__('Environment')) ?></span>
+    <div class="modracx-panel-actions">
+        <button type="button" class="modracx-run-btn modracx-panel-refresh"><?= $block->escapeHtml(__('Refresh')) ?></button>
+    </div>
+</div>
+
+<?php foreach ($sections as $title => $rows): ?>
+<div class="modracx-section"><?= $block->escapeHtml($title) ?></div>
+<?php foreach ($rows as $row): ?>
+<div class="modracx-row">
+    <span class="modracx-item-name">
+        <?= $block->escapeHtml($row['label']) ?>
+        <?php if ($row['flag'] !== ''): ?>
+        <em class="modracx-item-flag modracx-flag-<?= $block->escapeHtmlAttr($row['flag']) ?>">
+            <?= $block->escapeHtml($row['flag'] === 'err' ? __('problem') : __('note')) ?>
+        </em>
+        <?php endif; ?>
+    </span>
+    <em class="modracx-value"><?= $block->escapeHtml($row['value'] !== '' ? $row['value'] : '—') ?></em>
+</div>
+<?php endforeach; ?>
+<?php endforeach; ?>
+
+<div class="modracx-panel-note">
+    <?= $block->escapeHtml(__('Read from the running application, not from configuration files on disk. The search engine is contacted live with a 2 second timeout; everything else is local.')) ?>
+</div>
