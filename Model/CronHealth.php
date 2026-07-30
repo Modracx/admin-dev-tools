@@ -5,6 +5,7 @@ namespace Modracx\AdminDevTools\Model;
 
 use Magento\Cron\Model\ConfigInterface as CronConfig;
 use Magento\Cron\Model\Schedule;
+use Magento\Framework\App\Config\ScopeConfigInterface;
 use Magento\Framework\App\ResourceConnection;
 
 /**
@@ -27,11 +28,19 @@ class CronHealth
     /** No successful run within this many minutes means cron is probably not running. */
     private const STALE_MINUTES = 60;
 
-    private const ERROR_LIMIT = 10;
+    /** How many rows the run history shows. */
+    private const RUN_LIMIT = 40;
+
+    /** Statuses that describe a run that is over, one way or another. */
+    private const TERMINAL = [Schedule::STATUS_SUCCESS, Schedule::STATUS_ERROR, Schedule::STATUS_MISSED];
+
+    /** @var array<string, array<string, int>>|null */
+    private ?array $recentByJob = null;
 
     public function __construct(
         private readonly ResourceConnection $resource,
-        private readonly CronConfig $cronConfig
+        private readonly CronConfig $cronConfig,
+        private readonly ScopeConfigInterface $scopeConfig
     ) {
     }
 
@@ -87,15 +96,7 @@ class CronHealth
             $lastSuccess[(string) $row['job_code']] = (string) $row['last_success'];
         }
 
-        $recentSelect = $connection->select()
-            ->from($table, ['job_code', 'status', 'total' => new \Zend_Db_Expr('COUNT(*)')])
-            ->where('scheduled_at >= ?', $this->since(self::RECENT_HOURS . ' HOUR'))
-            ->group(['job_code', 'status']);
-
-        $recent = [];
-        foreach ($connection->fetchAll($recentSelect) as $row) {
-            $recent[(string) $row['job_code']][(string) $row['status']] = (int) $row['total'];
-        }
+        $recent = $this->getRecentCountsByJob();
 
         $groups = [];
         foreach ($jobToGroup as $jobCode => $group) {
@@ -130,31 +131,243 @@ class CronHealth
     }
 
     /**
-     * Most recent failures, newest first.
+     * Every declared job, with what the schedule says and what the table shows it did.
      *
-     * @return array<int, array{job_code: string, status: string, scheduled_at: ?string, executed_at: ?string, messages: ?string}>
+     * Built from the merged crontab.xml rather than from cron_schedule, so a job that has
+     * never been scheduled — the interesting case when cron is not running — still appears
+     * instead of silently missing from the list.
+     *
+     * @return array<int, array{
+     *     job_code: string, group: string, schedule: string, instance: string,
+     *     last_status: ?string, last_run: ?string, last_seconds: ?int, last_message: ?string,
+     *     avg_seconds: ?float, max_seconds: ?int, runs: int,
+     *     success: int, error: int, missed: int, pending: int
+     * }>
      */
-    public function getRecentErrors(): array
+    public function getJobs(): array
     {
+        $recent    = $this->getRecentCountsByJob();
+        $lastRuns  = $this->getLastRunByJob();
+        $durations = $this->getDurationsByJob();
+
+        $jobs = [];
+        foreach ($this->cronConfig->getJobs() as $group => $groupJobs) {
+            foreach ($groupJobs as $jobCode => $job) {
+                $code    = (string) $jobCode;
+                $last    = $lastRuns[$code] ?? null;
+                $timing  = $durations[$code] ?? null;
+
+                $jobs[] = [
+                    'job_code'     => $code,
+                    'group'        => (string) $group,
+                    'schedule'     => $this->resolveSchedule($job),
+                    'instance'     => (string) ($job['instance'] ?? ''),
+                    'last_status'  => $last['status'] ?? null,
+                    'last_run'     => $last['ran_at'] ?? null,
+                    'last_seconds' => isset($last['seconds']) ? (int) $last['seconds'] : null,
+                    'last_message' => $last['messages'] ?? null,
+                    'avg_seconds'  => isset($timing['avg_seconds']) ? (float) $timing['avg_seconds'] : null,
+                    'max_seconds'  => isset($timing['max_seconds']) ? (int) $timing['max_seconds'] : null,
+                    'runs'         => (int) ($timing['runs'] ?? 0),
+                    'success'      => $recent[$code][Schedule::STATUS_SUCCESS] ?? 0,
+                    'error'        => $recent[$code][Schedule::STATUS_ERROR] ?? 0,
+                    'missed'       => $recent[$code][Schedule::STATUS_MISSED] ?? 0,
+                    'pending'      => $recent[$code][Schedule::STATUS_PENDING] ?? 0,
+                ];
+            }
+        }
+
+        // Anything that failed floats to the top; the rest stay alphabetical so the list
+        // is stable between refreshes and can be scanned like an index.
+        usort($jobs, static function (array $a, array $b): int {
+            $rank = static fn (array $j): int => match (true) {
+                $j['error'] > 0                                => 0,
+                $j['missed'] > 0                               => 1,
+                $j['last_status'] === Schedule::STATUS_ERROR   => 2,
+                default                                        => 3,
+            };
+
+            return [$rank($a), $a['job_code']] <=> [$rank($b), $b['job_code']];
+        });
+
+        return $jobs;
+    }
+
+    /**
+     * Run history — successes and failures together, newest first.
+     *
+     * The mixed list is the point: a failure means something different when the ten runs
+     * around it succeeded than when nothing has finished all day.
+     *
+     * @param  string $filter One of all|success|error|missed
+     * @return array<int, array{job_code: string, status: string, scheduled_at: ?string, executed_at: ?string, finished_at: ?string, seconds: ?int, messages: ?string}>
+     */
+    public function getRecentRuns(string $filter = 'all'): array
+    {
+        $statuses = match ($filter) {
+            Schedule::STATUS_SUCCESS => [Schedule::STATUS_SUCCESS],
+            Schedule::STATUS_ERROR   => [Schedule::STATUS_ERROR],
+            Schedule::STATUS_MISSED  => [Schedule::STATUS_MISSED],
+            'failed'                 => [Schedule::STATUS_ERROR, Schedule::STATUS_MISSED],
+            default                  => self::TERMINAL,
+        };
+
         $connection = $this->resource->getConnection();
         $select     = $connection->select()
             ->from(
                 $this->resource->getTableName(self::TABLE),
-                ['job_code', 'status', 'scheduled_at', 'executed_at', 'messages']
+                [
+                    'job_code',
+                    'status',
+                    'scheduled_at',
+                    'executed_at',
+                    'finished_at',
+                    'messages',
+                    'seconds' => new \Zend_Db_Expr('TIMESTAMPDIFF(SECOND, executed_at, finished_at)'),
+                ]
             )
-            ->where('status IN (?)', [Schedule::STATUS_ERROR, Schedule::STATUS_MISSED])
-            ->where('scheduled_at >= ?', $this->since(self::RECENT_HOURS . ' HOUR'))
+            ->where('status IN (?)', $statuses)
+            ->where('scheduled_at >= ?', $this->since(self::SUCCESS_DAYS . ' DAY'))
             ->order('schedule_id DESC')
-            ->limit(self::ERROR_LIMIT);
+            ->limit(self::RUN_LIMIT);
 
         return $connection->fetchAll($select);
     }
 
     /**
+     * The last finished run of every job within the success window.
+     *
+     * @return array<string, array{status: string, ran_at: ?string, seconds: ?int, messages: ?string}>
+     */
+    private function getLastRunByJob(): array
+    {
+        $connection = $this->resource->getConnection();
+        $table      = $this->resource->getTableName(self::TABLE);
+
+        // Group-wise maximum: pick the newest finished row per job, then read that row.
+        // schedule_id is the primary key and monotonic, so it orders runs without
+        // depending on any of the nullable timestamp columns.
+        $latest = $connection->select()
+            ->from($table, ['last_id' => new \Zend_Db_Expr('MAX(schedule_id)')])
+            ->where('status IN (?)', self::TERMINAL)
+            ->where('scheduled_at >= ?', $this->since(self::SUCCESS_DAYS . ' DAY'))
+            ->group('job_code');
+
+        $select = $connection->select()
+            ->from(
+                $table,
+                [
+                    'job_code',
+                    'status',
+                    'messages',
+                    'ran_at'  => new \Zend_Db_Expr('COALESCE(finished_at, executed_at, scheduled_at)'),
+                    'seconds' => new \Zend_Db_Expr('TIMESTAMPDIFF(SECOND, executed_at, finished_at)'),
+                ]
+            )
+            ->where('schedule_id IN (?)', new \Zend_Db_Expr($latest->assemble()));
+
+        $rows = [];
+        foreach ($connection->fetchAll($select) as $row) {
+            $rows[(string) $row['job_code']] = $row;
+        }
+
+        return $rows;
+    }
+
+    /**
+     * How long each job takes when it works: run count, mean and worst.
+     *
+     * Only successful runs are measured — a job that died after two seconds says nothing
+     * about how long it takes to do its work.
+     *
+     * @return array<string, array{runs: int, avg_seconds: ?float, max_seconds: ?int}>
+     */
+    private function getDurationsByJob(): array
+    {
+        $connection = $this->resource->getConnection();
+        $select     = $connection->select()
+            ->from(
+                $this->resource->getTableName(self::TABLE),
+                [
+                    'job_code',
+                    'runs'        => new \Zend_Db_Expr('COUNT(*)'),
+                    'avg_seconds' => new \Zend_Db_Expr('AVG(TIMESTAMPDIFF(SECOND, executed_at, finished_at))'),
+                    'max_seconds' => new \Zend_Db_Expr('MAX(TIMESTAMPDIFF(SECOND, executed_at, finished_at))'),
+                ]
+            )
+            ->where('status = ?', Schedule::STATUS_SUCCESS)
+            ->where('executed_at IS NOT NULL')
+            ->where('finished_at IS NOT NULL')
+            ->where('scheduled_at >= ?', $this->since(self::SUCCESS_DAYS . ' DAY'))
+            ->group('job_code');
+
+        $rows = [];
+        foreach ($connection->fetchAll($select) as $row) {
+            $rows[(string) $row['job_code']] = $row;
+        }
+
+        return $rows;
+    }
+
+    /**
+     * Per job, per status row counts over the recent window. Memoised: the groups list and
+     * the jobs list both want it, and a panel render should not pay for it twice.
+     *
+     * @return array<string, array<string, int>>
+     */
+    private function getRecentCountsByJob(): array
+    {
+        if ($this->recentByJob !== null) {
+            return $this->recentByJob;
+        }
+
+        $connection = $this->resource->getConnection();
+        $select     = $connection->select()
+            ->from(
+                $this->resource->getTableName(self::TABLE),
+                ['job_code', 'status', 'total' => new \Zend_Db_Expr('COUNT(*)')]
+            )
+            ->where('scheduled_at >= ?', $this->since(self::RECENT_HOURS . ' HOUR'))
+            ->group(['job_code', 'status']);
+
+        $this->recentByJob = [];
+        foreach ($connection->fetchAll($select) as $row) {
+            $this->recentByJob[(string) $row['job_code']][(string) $row['status']] = (int) $row['total'];
+        }
+
+        return $this->recentByJob;
+    }
+
+    /**
+     * A job declares either a literal cron expression or a config path holding one.
+     *
+     * @param array<string, mixed> $job
+     */
+    private function resolveSchedule(array $job): string
+    {
+        if (!empty($job['schedule'])) {
+            return (string) $job['schedule'];
+        }
+
+        if (!empty($job['config_path'])) {
+            $value = (string) $this->scopeConfig->getValue((string) $job['config_path']);
+
+            return $value !== ''
+                ? $value
+                : (string) __('unset (%1)', $job['config_path']);
+        }
+
+        return (string) __('no schedule');
+    }
+
+    /**
      * Most recent successful finish across all jobs, plus how long ago that was.
      *
-     * The age is computed in SQL so it is measured against the same clock that wrote
-     * the row — PHP and MySQL do not necessarily agree on the timezone here.
+     * The age is computed in SQL, against UTC_TIMESTAMP() rather than NOW(). Magento's
+     * adapter pins the session to '+00:00' so today the two are the same thing, but cron
+     * writes these columns in UTC on purpose (ProcessCronQueueObserver stamps them from
+     * gmtTimestamp) — naming UTC explicitly keeps the comparison correct even on a
+     * connection whose timezone is not pinned, and says which clock is meant.
      *
      * @return array{last: ?string, minutes: ?int}
      */
@@ -166,7 +379,7 @@ class CronHealth
                 $this->resource->getTableName(self::TABLE),
                 [
                     'last'    => new \Zend_Db_Expr('MAX(finished_at)'),
-                    'minutes' => new \Zend_Db_Expr('TIMESTAMPDIFF(MINUTE, MAX(finished_at), NOW())'),
+                    'minutes' => new \Zend_Db_Expr('TIMESTAMPDIFF(MINUTE, MAX(finished_at), UTC_TIMESTAMP())'),
                 ]
             )
             ->where('status = ?', Schedule::STATUS_SUCCESS)
@@ -240,12 +453,17 @@ class CronHealth
         return self::RECENT_HOURS;
     }
 
+    public function getSuccessDays(): int
+    {
+        return self::SUCCESS_DAYS;
+    }
+
     /**
-     * A DB-side cutoff expression, so the comparison uses the database's clock —
-     * the same one that wrote scheduled_at.
+     * A DB-side cutoff expression in UTC, matching the clock cron writes these columns in.
+     * See getLastSuccess() for why it names UTC_TIMESTAMP() rather than NOW().
      */
     private function since(string $interval): \Zend_Db_Expr
     {
-        return new \Zend_Db_Expr(sprintf('DATE_SUB(NOW(), INTERVAL %s)', $interval));
+        return new \Zend_Db_Expr(sprintf('DATE_SUB(UTC_TIMESTAMP(), INTERVAL %s)', $interval));
     }
 }

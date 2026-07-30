@@ -3,8 +3,11 @@ declare(strict_types=1);
 
 namespace Modracx\AdminDevTools\Model;
 
+use Magento\Config\Model\Config\Reader\Source\Deployed\SettingChecker;
 use Magento\Framework\App\Config\ScopeConfigInterface;
+use Magento\Framework\App\DeploymentConfig\Reader as DeploymentReader;
 use Magento\Framework\App\ResourceConnection;
+use Magento\Framework\Config\File\ConfigFilePool;
 use Magento\Framework\Exception\LocalizedException;
 use Magento\Store\Model\ScopeInterface;
 use Magento\Store\Model\StoreManagerInterface;
@@ -35,10 +38,21 @@ class ConfigInspector
 
     private const PATH_PATTERN = '~^[a-z0-9_]+(/[a-z0-9_]+){1,5}$~i';
 
+    /** Where a fixed value can come from, in the order Magento resolves them. */
+    private const SOURCE_FILES = [
+        ConfigFilePool::APP_ENV    => 'app/etc/env.php',
+        ConfigFilePool::APP_CONFIG => 'app/etc/config.php',
+    ];
+
+    /** @var array<string, array<string, mixed>>|null */
+    private ?array $deployedByFile = null;
+
     public function __construct(
         private readonly ResourceConnection $resource,
         private readonly ScopeConfigInterface $scopeConfig,
-        private readonly StoreManagerInterface $storeManager
+        private readonly StoreManagerInterface $storeManager,
+        private readonly SettingChecker $settingChecker,
+        private readonly DeploymentReader $deploymentReader
     ) {
     }
 
@@ -72,6 +86,9 @@ class ConfigInspector
                 'value'      => $this->presentValue($row['value'], $masked),
                 'masked'     => $masked,
                 'updated_at' => $row['updated_at'] !== null ? (string) $row['updated_at'] : null,
+                // A row can be edited in the admin and still never be read: a deployed
+                // value wins over the database, silently.
+                'locked_by'  => $this->lockedBy($path, ScopeConfigInterface::SCOPE_TYPE_DEFAULT, null),
             ];
         }
 
@@ -103,7 +120,9 @@ class ConfigInspector
             (string) __('Default'),
             ScopeConfigInterface::SCOPE_TYPE_DEFAULT,
             null,
-            $masked
+            $masked,
+            ScopeConfigInterface::SCOPE_TYPE_DEFAULT,
+            null
         );
 
         foreach ($this->storeManager->getWebsites() as $website) {
@@ -112,7 +131,9 @@ class ConfigInspector
                 (string) __('Website: %1', $website->getName()),
                 ScopeInterface::SCOPE_WEBSITE,
                 (int) $website->getId(),
-                $masked
+                $masked,
+                ScopeInterface::SCOPE_WEBSITES,
+                (string) $website->getCode()
             );
         }
 
@@ -122,7 +143,9 @@ class ConfigInspector
                 (string) __('Store view: %1', $store->getName()),
                 ScopeInterface::SCOPE_STORE,
                 (int) $store->getId(),
-                $masked
+                $masked,
+                ScopeInterface::SCOPE_STORES,
+                (string) $store->getCode()
             );
         }
 
@@ -130,19 +153,106 @@ class ConfigInspector
     }
 
     /**
-     * @return array{scope: string, value: string, masked: bool, set: bool}
+     * @return array{scope: string, value: string, masked: bool, set: bool, locked_by: ?string}
      */
-    private function resolve(string $path, string $label, string $scopeType, ?int $scopeId, bool $maskedByPath): array
-    {
+    private function resolve(
+        string $path,
+        string $label,
+        string $scopeType,
+        ?int $scopeId,
+        bool $maskedByPath,
+        string $lockScope,
+        ?string $scopeCode
+    ): array {
         $value  = $this->scopeConfig->getValue($path, $scopeType, $scopeId);
         $masked = $maskedByPath || $this->isSensitive($path, $value);
 
         return [
-            'scope'  => $label,
-            'value'  => $this->presentValue($value, $masked),
-            'masked' => $masked,
-            'set'    => $value !== null && $value !== '',
+            'scope'     => $label,
+            'value'     => $this->presentValue($value, $masked),
+            'masked'    => $masked,
+            'set'       => $value !== null && $value !== '',
+            'locked_by' => $this->lockedBy($path, $lockScope, $scopeCode),
         ];
+    }
+
+    /**
+     * Where a path is pinned outside the database, if it is.
+     *
+     * A value in app/etc/config.php, app/etc/env.php or a CONFIG__ environment variable
+     * wins over core_config_data and greys the field out in the admin — so a save appears
+     * to work and changes nothing. Magento's own SettingChecker decides *whether* a path
+     * is fixed; the files are then read separately to say *which one* fixed it, because
+     * "it's locked" and "it's locked in env.php on this server only" are different
+     * problems with different fixes.
+     */
+    private function lockedBy(string $path, string $scope, ?string $scopeCode): ?string
+    {
+        if (!$this->settingChecker->isReadOnly($path, $scope, $scopeCode)) {
+            return null;
+        }
+
+        if ($this->settingChecker->getPlaceholderValue($path, $scope, $scopeCode) !== null) {
+            return (string) __('an environment variable');
+        }
+
+        $keys = ['system/' . $scope . ($scopeCode !== null ? '/' . $scopeCode : '') . '/' . $path];
+        if ($scope !== ScopeConfigInterface::SCOPE_TYPE_DEFAULT) {
+            // SettingChecker falls back to the default scope, so a website-scope lookup can
+            // be answered by a default-scope entry. Follow the same fallback here.
+            $keys[] = 'system/' . ScopeConfigInterface::SCOPE_TYPE_DEFAULT . '/' . $path;
+        }
+
+        foreach ($this->deployedFiles() as $file => $data) {
+            foreach ($keys as $key) {
+                if ($this->dig($data, explode('/', $key)) !== null) {
+                    return $file;
+                }
+            }
+        }
+
+        return (string) __('app/etc/config.php or app/etc/env.php');
+    }
+
+    /**
+     * The two deployment files, read individually rather than through the merged
+     * DeploymentConfig, which cannot say where a value came from.
+     *
+     * @return array<string, array<string, mixed>>
+     */
+    private function deployedFiles(): array
+    {
+        if ($this->deployedByFile !== null) {
+            return $this->deployedByFile;
+        }
+
+        $this->deployedByFile = [];
+        foreach (self::SOURCE_FILES as $pool => $label) {
+            try {
+                $this->deployedByFile[$label] = $this->deploymentReader->load($pool);
+            } catch (\Exception $e) {
+                $this->deployedByFile[$label] = [];
+            }
+        }
+
+        return $this->deployedByFile;
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     * @param array<int, string>   $segments
+     */
+    private function dig(array $data, array $segments): mixed
+    {
+        $node = $data;
+        foreach ($segments as $segment) {
+            if (!is_array($node) || !array_key_exists($segment, $node)) {
+                return null;
+            }
+            $node = $node[$segment];
+        }
+
+        return $node;
     }
 
     private function isSensitive(string $path, mixed $value): bool

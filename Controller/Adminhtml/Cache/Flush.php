@@ -9,6 +9,7 @@ use Magento\Framework\App\Action\HttpPostActionInterface;
 use Magento\Framework\App\Cache\Manager;
 use Magento\Framework\Controller\Result\JsonFactory;
 use Modracx\AdminDevTools\Model\CacheTypeAcl;
+use Modracx\AdminDevTools\Model\FlushVerifier;
 
 class Flush extends Action implements HttpPostActionInterface
 {
@@ -18,7 +19,8 @@ class Flush extends Action implements HttpPostActionInterface
         Context $context,
         private readonly Manager $cacheManager,
         private readonly CacheTypeAcl $cacheTypeAcl,
-        private readonly JsonFactory $jsonFactory
+        private readonly JsonFactory $jsonFactory,
+        private readonly FlushVerifier $verifier
     ) {
         parent::__construct($context);
     }
@@ -38,8 +40,16 @@ class Flush extends Action implements HttpPostActionInterface
         }
 
         try {
+            // Seeded before the clean and read back after it, so the answer describes what
+            // happened rather than what was attempted.
+            $probe = $this->verifier->probeType($type);
             $this->cacheManager->clean([$type]);
-            return $result->setData(['success' => true, 'message' => (string) __('Cache flushed successfully.')]);
+            $verified = $this->verifier->verifyType($type, $probe);
+
+            return $result->setData([
+                'success' => $verified !== false,
+                'message' => (string) __('Cache flushed successfully.') . $this->verifier->note($verified),
+            ]);
         } catch (\Exception $e) {
             return $result->setData(['success' => false, 'message' => $e->getMessage()]);
         }

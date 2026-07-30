@@ -8,4 +8,13 @@
             </argument>
         </arguments>
     </type>
+
+    <!--
+        Captures outgoing mail at the transport, which is the last point where the message
+        still exists as a rendered object. Global rather than per-area: mail is sent from
+        the frontend, the admin, cron and consumers alike.
+    -->
+    <type name="Magento\Framework\Mail\TransportInterface">
+        <plugin name="modracx_capture_mail" type="Modracx\AdminDevTools\Plugin\CaptureMail" sortOrder="10"/>
+    </type>
 </config>

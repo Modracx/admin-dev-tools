@@ -5,5 +5,8 @@
         <job name="modracx_prune_activity_log" instance="Modracx\AdminDevTools\Cron\PruneActivityLog" method="execute">
             <schedule>27 3 * * *</schedule>
         </job>
+        <job name="modracx_prune_mail_log" instance="Modracx\AdminDevTools\Cron\PruneMailLog" method="execute">
+            <schedule>32 3 * * *</schedule>
+        </job>
     </group>
 </config>

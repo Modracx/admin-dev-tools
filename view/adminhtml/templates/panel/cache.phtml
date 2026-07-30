@@ -10,6 +10,9 @@ $cacheActions = $block->getCacheActions();
     </div>
 </div>
 
+<?php /* What the last flush actually did — a tick on a button is not evidence. */ ?>
+<div class="modracx-verdict" data-cache-verdict hidden></div>
+
 <?php if (!empty($cacheActions)): ?>
 <div class="modracx-section"><?= $block->escapeHtml(__('Additional Cache Management')) ?></div>
 <?php foreach ($cacheActions as $action): ?>

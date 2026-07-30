@@ -1,0 +1,48 @@
+<?php
+/** @var \Modracx\AdminDevTools\Block\Adminhtml\Panel $block */
+$summary = (array) $block->getData('summary');
+$tables  = (array) ($summary['tables'] ?? []);
+?>
+<div class="modracx-panel-head">
+    <span class="modracx-panel-title"><?= $block->escapeHtml(__('Database')) ?></span>
+    <div class="modracx-panel-actions">
+        <button type="button" class="modracx-run-btn modracx-panel-refresh"><?= $block->escapeHtml(__('Refresh')) ?></button>
+    </div>
+</div>
+
+<div class="modracx-chips">
+    <span class="modracx-chip"><?= $block->escapeHtml($summary['database'] ?? '') ?></span>
+    <span class="modracx-chip"><?= $block->escapeHtml(__('total')) ?>
+        <b><?= $block->escapeHtml($block->formatBytes((int) ($summary['total_bytes'] ?? 0))) ?></b></span>
+    <span class="modracx-chip"><?= $block->escapeHtml(__('tables')) ?>
+        <b><?= $block->escapeHtml((string) ($summary['table_count'] ?? 0)) ?></b></span>
+</div>
+
+<?php if (empty($tables)): ?>
+<div class="modracx-panel-empty"><?= $block->escapeHtml(__('No table statistics available.')) ?></div>
+<?php else: ?>
+<div class="modracx-section"><?= $block->escapeHtml(__('Largest tables')) ?></div>
+<?php foreach ($tables as $table): ?>
+<div class="modracx-row modracx-stack">
+    <span class="modracx-item-name">
+        <code class="modracx-code"><?= $block->escapeHtml($table['name']) ?></code>
+        <?php if ($table['note'] !== ''): ?>
+        <em class="modracx-item-flag modracx-flag-warn"><?= $block->escapeHtml(__('prunable')) ?></em>
+        <?php endif; ?>
+        <em class="modracx-item-desc">
+            <?= $block->escapeHtml($block->formatBytes((int) $table['total_bytes'])) ?>
+            (<?= $block->escapeHtml((string) $table['share']) ?>%)
+            · <?= $block->escapeHtml(__('~%1 rows', number_format((float) $table['rows']))) ?>
+            · <?= $block->escapeHtml(__('index %1', $block->formatBytes((int) $table['index_bytes']))) ?>
+            <?php if ($table['note'] !== ''): ?>
+            <br><?= $block->escapeHtml($table['note']) ?>
+            <?php endif; ?>
+        </em>
+    </span>
+</div>
+<?php endforeach; ?>
+<?php endif; ?>
+
+<div class="modracx-panel-note">
+    <?= $block->escapeHtml(__('Row counts are InnoDB estimates from information_schema — right for "what is eating the disk", not for accounting. Read-only on purpose: emptying a table is not a cache flush, and belongs at a prompt where it can be thought about.')) ?>
+</div>

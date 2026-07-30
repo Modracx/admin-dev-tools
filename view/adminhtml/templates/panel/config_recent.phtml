@@ -16,6 +16,12 @@ $changes = (array) $block->getData('changes');
 <div class="modracx-row modracx-stack">
     <span class="modracx-item-name">
         <code class="modracx-code"><?= $block->escapeHtml($change['path']) ?></code>
+        <?php if (!empty($change['locked_by'])): ?>
+        <em class="modracx-item-flag modracx-flag-warn"
+            title="<?= $block->escapeHtmlAttr(__('Fixed in %1 — this database row is never read.', $change['locked_by'])) ?>">
+            <?= $block->escapeHtml(__('overridden')) ?>
+        </em>
+        <?php endif; ?>
         <em class="modracx-item-desc">
             <?= $block->escapeHtml($change['scope']) ?><?php if ($change['scope'] !== 'default'): ?>
             <?= $block->escapeHtml(' #' . $change['scope_id']) ?><?php endif; ?>

@@ -1,0 +1,65 @@
+<?php
+/** @var \Modracx\AdminDevTools\Block\Adminhtml\Panel $block */
+$flags    = (array) $block->getData('flags');
+$warnings = (array) $block->getData('warnings');
+$mode     = (string) $block->getData('mode');
+$canWrite = (bool) $block->getData('can_write');
+
+$groups = [
+    'debug'  => __('Debugging'),
+    'static' => __('Assets'),
+];
+?>
+<div class="modracx-panel-head">
+    <span class="modracx-panel-title"><?= $block->escapeHtml(__('Dev flags — %1 mode', $mode)) ?></span>
+    <div class="modracx-panel-actions">
+        <button type="button" class="modracx-run-btn modracx-panel-refresh"><?= $block->escapeHtml(__('Refresh')) ?></button>
+    </div>
+</div>
+
+<div class="modracx-verdict" data-flag-verdict hidden></div>
+
+<?php foreach ($warnings as $warning): ?>
+<div class="modracx-panel-note"><?= $block->escapeHtml($warning) ?></div>
+<?php endforeach; ?>
+
+<?php if (!$canWrite): ?>
+<div class="modracx-panel-note"><?= $block->escapeHtml(__('Read-only: your role cannot change these.')) ?></div>
+<?php endif; ?>
+
+<?php foreach ($groups as $groupKey => $groupLabel): ?>
+<?php $inGroup = array_filter($flags, static fn (array $f): bool => $f['group'] === $groupKey); ?>
+<?php if (empty($inGroup)): ?><?php continue; ?><?php endif; ?>
+
+<div class="modracx-section"><?= $block->escapeHtml($groupLabel) ?></div>
+<?php foreach ($inGroup as $flag): ?>
+<div class="modracx-row">
+    <span class="modracx-item-name">
+        <?= $block->escapeHtml($flag['label']) ?>
+        <?php if ($flag['locked']): ?>
+        <em class="modracx-item-flag modracx-flag-warn"
+            title="<?= $block->escapeHtmlAttr(__('Fixed in app/etc/config.php, app/etc/env.php or an environment variable')) ?>">
+            <?= $block->escapeHtml(__('locked')) ?>
+        </em>
+        <?php endif; ?>
+        <em class="modracx-item-desc">
+            <code class="modracx-code"><?= $block->escapeHtml($flag['path']) ?></code>
+            <?php if ($flag['note'] !== ''): ?>
+            <br><?= $block->escapeHtml($flag['note']) ?>
+            <?php endif; ?>
+        </em>
+    </span>
+    <button type="button"
+            class="modracx-run-btn modracx-flag-btn<?= $flag['enabled'] ? ' modracx-flag-on' : '' ?>"
+            data-flag="<?= $block->escapeHtmlAttr($flag['key']) ?>"
+            data-enable="<?= $flag['enabled'] ? '0' : '1' ?>"
+            <?= (!$canWrite || $flag['locked']) ? 'disabled' : '' ?>>
+        <?= $block->escapeHtml($flag['enabled'] ? __('on') : __('off')) ?>
+    </button>
+</div>
+<?php endforeach; ?>
+<?php endforeach; ?>
+
+<div class="modracx-panel-note">
+    <?= $block->escapeHtml(__('Writes the default scope only and flushes the config cache, verifying the flush actually emptied it. Per-store developer switches are almost always a mistake, so they are not offered here.')) ?>
+</div>

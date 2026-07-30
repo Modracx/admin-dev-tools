@@ -3,10 +3,28 @@
 $badge  = (array) $block->getData('badge');
 $counts = (array) $block->getData('counts');
 $groups = (array) $block->getData('groups');
-$errors = (array) $block->getData('errors');
+$jobs   = (array) $block->getData('jobs');
+$runs   = (array) $block->getData('runs');
 $hours  = (int) $block->getData('recent_hours');
+$days   = (int) $block->getData('success_days');
+$canRun = (bool) $block->getData('can_run');
+$runStatus = (string) $block->getData('run_status');
 $queues = (array) $block->getData('queues');
 $queuesAvailable = (bool) $block->getData('queues_available');
+
+$runFilters = [
+    'all'     => __('all'),
+    'success' => __('success'),
+    'error'   => __('error'),
+    'missed'  => __('missed'),
+];
+
+$flagFor = static fn (?string $status): string => match ($status) {
+    'success' => 'modracx-flag-ok',
+    'error'   => 'modracx-flag-err',
+    'missed'  => 'modracx-flag-warn',
+    default   => '',
+};
 ?>
 <div class="modracx-panel-head">
     <span class="modracx-panel-title"><?= $block->escapeHtml(__('Cron — last %1 hours', $hours)) ?></span>
@@ -62,19 +80,104 @@ $queuesAvailable = (bool) $block->getData('queues_available');
 <?php endforeach; ?>
 <?php endif; ?>
 
-<?php if (!empty($errors)): ?>
-<div class="modracx-section"><?= $block->escapeHtml(__('Recent failures')) ?></div>
-<?php foreach ($errors as $error): ?>
+<div class="modracx-section"><?= $block->escapeHtml(__('Jobs')) ?></div>
+<?php if (!$canRun): ?>
+<div class="modracx-panel-note">
+    <?= $block->escapeHtml(__('Timings are measured over the last %1 days; counts over the last %2 hours.', $days, $hours)) ?>
+</div>
+<?php else: ?>
+<div class="modracx-panel-note">
+    <?= $block->escapeHtml(__('Run executes the job in this request, on this store, and records it in cron_schedule like a scheduled run. Long jobs may exceed the request timeout — the job keeps going, the panel stops waiting.')) ?>
+</div>
+<?php endif; ?>
+
+<div class="modracx-panel-form">
+    <input type="text" class="modracx-input modracx-filter" id="modracx-cron-filter"
+           placeholder="<?= $block->escapeHtmlAttr(__('Filter by job or group…')) ?>"
+           spellcheck="false" autocomplete="off">
+</div>
+
+<?php if (empty($jobs)): ?>
+<div class="modracx-panel-empty"><?= $block->escapeHtml(__('No cron jobs are declared.')) ?></div>
+<?php else: ?>
+<div class="modracx-filter-list">
+<?php foreach ($jobs as $job): ?>
+<div class="modracx-row modracx-filter-row"
+     data-filter="<?= $block->escapeHtmlAttr(strtolower($job['job_code'] . ' ' . $job['group'])) ?>">
+    <span class="modracx-item-name">
+        <?= $block->escapeHtml($job['job_code']) ?>
+        <?php if ($job['last_status'] !== null): ?>
+        <em class="modracx-item-flag <?= $block->escapeHtmlAttr($flagFor($job['last_status'])) ?>"
+            title="<?= $block->escapeHtmlAttr(__('Last run: %1 UTC', (string) $job['last_run'])) ?>">
+            <?= $block->escapeHtml($job['last_status']) ?>
+            <?= $block->escapeHtml($block->formatAgo($job['last_run'])) ?>
+        </em>
+        <?php else: ?>
+        <em class="modracx-item-flag" title="<?= $block->escapeHtmlAttr(__('Never run in the last %1 days', $days)) ?>">
+            <?= $block->escapeHtml(__('never run')) ?>
+        </em>
+        <?php endif; ?>
+        <em class="modracx-item-desc">
+            <code class="modracx-code"><?= $block->escapeHtml($job['schedule']) ?></code>
+            · <?= $block->escapeHtml($job['group']) ?>
+            <?php if ($job['runs'] > 0): ?>
+            · <?= $block->escapeHtml(__(
+                'takes %1 avg, %2 worst over %3 run(s)',
+                $block->formatDuration($job['avg_seconds']),
+                $block->formatDuration($job['max_seconds']),
+                $job['runs']
+            )) ?>
+            <?php endif; ?>
+            <?php if ($job['error'] > 0 || $job['missed'] > 0): ?>
+            · <?= $block->escapeHtml(__('%1 error / %2 missed in %3h', $job['error'], $job['missed'], $hours)) ?>
+            <?php endif; ?>
+            <?php if (!empty($job['last_message']) && $job['last_status'] === 'error'): ?>
+            <br><?= $block->escapeHtml(mb_substr((string) $job['last_message'], 0, 300)) ?>
+            <?php endif; ?>
+        </em>
+    </span>
+    <?php if ($canRun): ?>
+    <button type="button" class="modracx-run-btn modracx-cron-run-btn"
+            data-job="<?= $block->escapeHtmlAttr($job['job_code']) ?>"><?= $block->escapeHtml(__('Run')) ?></button>
+    <?php endif; ?>
+</div>
+<?php endforeach; ?>
+</div>
+<div class="modracx-panel-empty modracx-filter-empty" hidden><?= $block->escapeHtml(__('No job matches that filter.')) ?></div>
+<?php endif; ?>
+
+<div class="modracx-section"><?= $block->escapeHtml(__('Run history')) ?></div>
+<div class="modracx-panel-actions modracx-run-filters">
+    <?php foreach ($runFilters as $key => $label): ?>
+    <button type="button"
+            class="modracx-run-btn modracx-run-filter<?= $runStatus === $key ? ' modracx-tab-active' : '' ?>"
+            data-run-status="<?= $block->escapeHtmlAttr($key) ?>"><?= $block->escapeHtml($label) ?></button>
+    <?php endforeach; ?>
+</div>
+
+<?php if (empty($runs)): ?>
+<div class="modracx-panel-empty">
+    <?= $block->escapeHtml(__('No runs recorded in the last %1 days.', $days)) ?>
+</div>
+<?php else: ?>
+<?php foreach ($runs as $run): ?>
 <div class="modracx-row modracx-stack">
     <span class="modracx-item-name">
-        <?= $block->escapeHtml((string) $error['job_code']) ?>
-        <em class="modracx-item-flag <?= $error['status'] === 'error' ? 'modracx-flag-err' : 'modracx-flag-warn' ?>">
-            <?= $block->escapeHtml((string) $error['status']) ?>
+        <?= $block->escapeHtml((string) $run['job_code']) ?>
+        <em class="modracx-item-flag <?= $block->escapeHtmlAttr($flagFor((string) $run['status'])) ?>">
+            <?= $block->escapeHtml((string) $run['status']) ?>
         </em>
         <em class="modracx-item-desc">
-            <?= $block->escapeHtml((string) $error['scheduled_at']) ?>
-            <?php if (!empty($error['messages'])): ?>
-            — <?= $block->escapeHtml(mb_substr((string) $error['messages'], 0, 300)) ?>
+            <span title="<?= $block->escapeHtmlAttr(__('Scheduled %1 UTC', (string) $run['scheduled_at'])) ?>">
+                <?= $block->escapeHtml($block->formatAgo($run['finished_at'] ?: $run['scheduled_at'])) ?>
+            </span>
+            <?php if ($run['status'] === 'success' || $run['seconds'] !== null): ?>
+            · <?= $block->escapeHtml(__('took %1', $block->formatDuration(
+                $run['seconds'] === null ? null : (int) $run['seconds']
+            ))) ?>
+            <?php endif; ?>
+            <?php if (!empty($run['messages'])): ?>
+            — <?= $block->escapeHtml(mb_substr((string) $run['messages'], 0, 300)) ?>
             <?php endif; ?>
         </em>
     </span>

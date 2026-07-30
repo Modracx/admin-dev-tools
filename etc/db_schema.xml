@@ -36,4 +36,29 @@
             <column name="entity_table"/>
         </index>
     </table>
+
+    <table name="modracx_mail_log" resource="default" engine="innodb" comment="Modracx captured outgoing mail">
+        <column xsi:type="int" name="mail_id" unsigned="true" nullable="false" identity="true" comment="Mail ID"/>
+        <column xsi:type="timestamp" name="sent_at" on_update="false" nullable="false" default="CURRENT_TIMESTAMP" comment="When"/>
+
+        <column xsi:type="varchar" name="subject" length="255" nullable="true" comment="Subject"/>
+        <column xsi:type="text" name="mail_to" nullable="true" comment="To addresses"/>
+        <column xsi:type="text" name="mail_from" nullable="true" comment="From addresses"/>
+        <column xsi:type="text" name="mail_cc" nullable="true" comment="Cc addresses"/>
+        <column xsi:type="text" name="mail_bcc" nullable="true" comment="Bcc addresses"/>
+
+        <column xsi:type="varchar" name="content_type" length="100" nullable="true" comment="MIME type of the body"/>
+        <column xsi:type="mediumtext" name="body" nullable="true" comment="Rendered body"/>
+
+        <column xsi:type="smallint" name="delivered" unsigned="true" nullable="false" default="1" comment="0 when delivery was suppressed"/>
+        <column xsi:type="text" name="error" nullable="true" comment="Transport error, if the send failed"/>
+
+        <constraint xsi:type="primary" referenceId="PRIMARY">
+            <column name="mail_id"/>
+        </constraint>
+
+        <index referenceId="MODRACX_MAIL_LOG_SENT_AT" indexType="btree">
+            <column name="sent_at"/>
+        </index>
+    </table>
 </schema>

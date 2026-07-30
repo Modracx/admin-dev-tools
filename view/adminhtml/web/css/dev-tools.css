@@ -340,6 +340,13 @@ body.modracx-scroll-lock {
     color: #ffd9a0;
 }
 .modracx-run-btn.modracx-busy { opacity: .5; pointer-events: none; }
+.modracx-run-btn:disabled     { opacity: .4; cursor: not-allowed; }
+/* A dev flag that is on reads as on at a glance — the switch is the state, not a verb */
+.modracx-run-btn.modracx-flag-on {
+    color: var(--mdx-ok);
+    background: rgba(52,211,153,.18);
+    border-color: rgba(52,211,153,.4);
+}
 .modracx-run-btn.modracx-ok   { background: rgba(52,211,153,.25); color: var(--mdx-ok);  border-color: rgba(52,211,153,.4); }
 .modracx-run-btn.modracx-err  { background: rgba(252,165,165,.2); color: var(--mdx-err); border-color: rgba(252,165,165,.35); }
 
@@ -487,6 +494,33 @@ body.modracx-scroll-lock {
 .modracx-item-flag.modracx-flag-err {
     color: var(--mdx-err);
     background: rgba(252,165,165,.16);
+}
+.modracx-item-flag.modracx-flag-ok {
+    color: var(--mdx-ok);
+    background: rgba(52,211,153,.14);
+}
+
+/* Captured email body, rendered in its own sandbox */
+.modracx-mail-frame {
+    display: block;
+    width: calc(100% - 24px);
+    height: 320px;
+    margin: 8px 12px;
+    background: #fff;
+    border: 1px solid var(--mdx-line-mid);
+    border-radius: 4px;
+}
+
+/* Status filter strip above the cron run history */
+.modracx-run-filters {
+    display: flex;
+    gap: 4px;
+    padding: 6px 12px 2px;
+}
+.modracx-run-filter.modracx-tab-active {
+    color: var(--mdx-accent);
+    border-color: var(--mdx-accent-line);
+    background: var(--mdx-accent-bg);
 }
 
 /* Config values and paths */

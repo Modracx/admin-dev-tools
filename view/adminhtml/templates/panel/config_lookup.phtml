@@ -30,6 +30,12 @@ $error   = (string) $block->getData('error');
 <div class="modracx-row modracx-stack">
     <span class="modracx-item-name">
         <?= $block->escapeHtml($result['scope']) ?>
+        <?php if (!empty($result['locked_by'])): ?>
+        <em class="modracx-item-flag modracx-flag-warn"
+            title="<?= $block->escapeHtmlAttr(__('Fixed in %1 — the admin field is read-only and a database value would be ignored.', $result['locked_by'])) ?>">
+            <?= $block->escapeHtml(__('locked by %1', $result['locked_by'])) ?>
+        </em>
+        <?php endif; ?>
         <em class="modracx-value<?= $result['masked'] ? ' modracx-value-masked' : '' ?>">
             <?php if (!$result['set'] && !$result['masked']): ?>
             <span class="modracx-value-unset"><?= $block->escapeHtml(__('(not set)')) ?></span>
