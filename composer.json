@@ -2,7 +2,7 @@
     "name": "modracx/mage-admin-dev-tools",
     "description": "Admin developer toolbar for Magento 2 — one-click cache flush and per-indexer reindex buttons",
     "type": "magento2-module",
-    "version": "1.1.0",
+    "version": "1.0.1",
     "license": "MIT",
     "require": {
         "php": ">=8.1",

@@ -304,5 +304,5 @@ After disabling, clear caches to ensure no remnants of the launcher remain.
 
 ## Happy hacking!
 
-You now have a **premium, production‑ready developer toolbar** that elevates Magento admin productivity while staying safe, lightweight, and visually polished. For updates, documentation, or to open an issue, visit the [Modracx Portal](https://modracx.dpdns.org/) or check the GitHub repository.
+You now have a **premium, production‑ready developer toolbar** that elevates Magento admin productivity while staying safe, lightweight, and visually polished. For updates, documentation, or to open an issue, visit the [Modracx Portal](https://modracx.com/) or check the GitHub repository.
 
